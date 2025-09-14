@@ -15,17 +15,16 @@ if (window.mermaid) {
   mermaid.initialize({ startOnLoad: false });
 }
 
-marked.use({
-  renderer: {
-    code(code, infostring) {
-      const lang = (infostring || '').trim().toLowerCase();
-      if (lang === 'mermaid') {
-        return `<div class="mermaid">${code}</div>`;
-      }
-      return false;
-    }
+const renderer = new marked.Renderer();
+const originalCodeRenderer = renderer.code.bind(renderer);
+renderer.code = function (code, infostring, escaped) {
+  const lang = (infostring || '').trim().toLowerCase();
+  if (lang === 'mermaid') {
+    return `<div class="mermaid">${code}</div>`;
   }
-});
+  return originalCodeRenderer(code, infostring, escaped);
+};
+marked.setOptions({ renderer });
 
 // Enable drag to resize panes
 let isDraggingEditor = false;
