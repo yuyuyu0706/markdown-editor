@@ -15,16 +15,18 @@ if (window.mermaid) {
   mermaid.initialize({ startOnLoad: false });
 }
 
-const renderer = new marked.Renderer();
-const originalCodeRenderer = renderer.code.bind(renderer);
-renderer.code = function (code, infostring, escaped) {
-  const lang = (infostring || '').trim().toLowerCase();
-  if (lang === 'mermaid') {
-    return `<div class="mermaid">${code}</div>`;
+// Convert mermaid code fences to diagram containers
+marked.use({
+  renderer: {
+    code(code, infostring, escaped) {
+      const lang = (infostring || '').trim().toLowerCase();
+      if (lang === 'mermaid') {
+        return `<div class="mermaid">${code}</div>`;
+      }
+      return false; // use default renderer
+    }
   }
-  return originalCodeRenderer(code, infostring, escaped);
-};
-marked.setOptions({ renderer });
+});
 
 // Enable drag to resize panes
 let isDraggingEditor = false;
@@ -126,6 +128,16 @@ function update() {
   });
 
   preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false });
+
+  // Fallback: convert any remaining mermaid code blocks after parsing
+  preview.querySelectorAll('pre code.language-mermaid').forEach(block => {
+    const pre = block.parentElement;
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = block.textContent;
+    pre.replaceWith(div);
+  });
+
   if (window.mermaid) {
     try {
       const nodes = preview.querySelectorAll('.mermaid');
