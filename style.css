@@ -59,7 +59,7 @@ textarea {
   flex: 1;
   height: 100%;
   padding: 1rem;
-  overflow-y: auto;
+  overflow: auto;
   background-color: #f6faff;
   color: #002244;
 }

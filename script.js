@@ -12,7 +12,10 @@ let tocItems = [];
 let headingPositions = [];
 
 if (window.mermaid) {
-  mermaid.initialize({ startOnLoad: false });
+  mermaid.initialize({
+    startOnLoad: false,
+    flowchart: { htmlLabels: false }
+  });
 }
 
 // Convert mermaid code fences to diagram containers
