@@ -75,12 +75,10 @@ cd markdown-editor
 
 Mermaidのフローチャートなどを描画するには、コードブロックの言語に `mermaid` を指定します。
 
-````markdown
 ```mermaid
 flowchart LR
   A --> B
 ```
-````
 
 ---
 
