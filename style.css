@@ -59,7 +59,7 @@ textarea {
   flex: 1;
   height: 100%;
   padding: 1rem;
-  overflow-y: auto;
+  overflow: auto;
   background-color: #f6faff;
   color: #002244;
 }
@@ -93,6 +93,19 @@ textarea {
 #toc .toc-item.active {
   color: #0055aa;
   font-weight: bold;
+}
+
+
+#preview img,
+#preview .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid .label foreignObject > div {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 h1, h2, h3, h4, h5 {

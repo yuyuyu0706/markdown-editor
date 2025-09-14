@@ -11,6 +11,53 @@ let headings = [];
 let tocItems = [];
 let headingPositions = [];
 
+if (window.mermaid) {
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose',
+    flowchart: { htmlLabels: true, wrap: true }
+  });
+}
+
+function insertMermaidLineBreaks(code) {
+  function insertBreaks(text) {
+    let result = '';
+    let count = 0;
+    for (const ch of text) {
+      const w = ch.charCodeAt(0) > 0xff ? 2 : 1;
+      if (count + w > 22) {
+        result += '<br>';
+        count = 0;
+      }
+      result += ch;
+      count += w;
+    }
+    return result;
+  }
+  return code.replace(/\[([^\]]+)\]/g, (_, label) => `[${insertBreaks(label)}]`);
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Convert mermaid code fences to diagram containers
+marked.use({
+  renderer: {
+    code(code, infostring, escaped) {
+      const lang = (infostring || '').trim().toLowerCase();
+      if (lang === 'mermaid') {
+        const processed = insertMermaidLineBreaks(code);
+        return `<div class="mermaid">${escapeHtml(processed)}</div>`;
+      }
+      return false; // use default renderer
+    }
+  }
+});
+
 // Enable drag to resize panes
 let isDraggingEditor = false;
 let isDraggingTOC = false;
@@ -111,6 +158,28 @@ function update() {
   });
 
   preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false });
+
+  // Fallback: convert any remaining mermaid code blocks after parsing
+  preview.querySelectorAll('pre code.language-mermaid').forEach(block => {
+    const pre = block.parentElement;
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = insertMermaidLineBreaks(block.textContent);
+    pre.replaceWith(div);
+  });
+
+  if (window.mermaid) {
+    try {
+      const nodes = preview.querySelectorAll('.mermaid');
+      if (mermaid.run) {
+        mermaid.run({ nodes });
+      } else if (mermaid.init) {
+        mermaid.init(undefined, nodes);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
   buildTOC();
 }
 
