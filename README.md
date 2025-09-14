@@ -71,6 +71,19 @@ cd markdown-editor
 
 ---
 
+### 4. Mermaid記法の例
+
+Mermaidのフローチャートなどを描画するには、コードブロックの言語に `mermaid` を指定します。
+
+````markdown
+```mermaid
+flowchart LR
+  A --> B
+```
+````
+
+---
+
 ## 📦 ライブラリ
 
 - [marked.js](https://github.com/markedjs/marked)：MarkdownをHTMLに変換

@@ -22,6 +22,7 @@ marked.use({
       if (lang === 'mermaid') {
         return `<div class="mermaid">${code}</div>`;
       }
+      return false;
     }
   }
 });
@@ -128,7 +129,12 @@ function update() {
   preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false });
   if (window.mermaid) {
     try {
-      mermaid.run({ nodes: preview.querySelectorAll('.mermaid') });
+      const nodes = preview.querySelectorAll('.mermaid');
+      if (mermaid.run) {
+        mermaid.run({ nodes });
+      } else if (mermaid.init) {
+        mermaid.init(undefined, nodes);
+      }
     } catch (e) {
       console.error(e);
     }
