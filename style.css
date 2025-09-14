@@ -34,11 +34,11 @@ main {
 }
 
 textarea {
+  flex: none;
   width: 50%;
   height: 100%;
   padding: 1rem;
   border: none;
-  border-right: 2px solid #c2dbff;
   resize: none;
   font-size: 1rem;
   outline: none;
@@ -47,7 +47,15 @@ textarea {
   font-family: monospace;
 }
 
+#divider {
+  width: 5px;
+  background-color: #c2dbff;
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+
 #preview {
+  flex: none;
   width: 50%;
   height: 100%;
   padding: 1rem;

@@ -1,6 +1,37 @@
 const editor = document.getElementById('editor');
 const preview = document.getElementById('preview');
+const divider = document.getElementById('divider');
+const mainContainer = document.querySelector('main');
 const imageInput = document.getElementById('imageInput');
+
+// Enable drag to resize between editor and preview
+let isDragging = false;
+
+divider.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  document.body.style.cursor = 'col-resize';
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const rect = mainContainer.getBoundingClientRect();
+  const minWidth = 100;
+  const dividerWidth = divider.offsetWidth;
+  let newEditorWidth = e.clientX - rect.left;
+  const maxWidth = rect.width - dividerWidth - minWidth;
+  if (newEditorWidth < minWidth) newEditorWidth = minWidth;
+  if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
+  editor.style.width = `${newEditorWidth}px`;
+  preview.style.width = `${rect.width - newEditorWidth - dividerWidth}px`;
+});
+
+document.addEventListener('mouseup', () => {
+  if (isDragging) {
+    isDragging = false;
+    document.body.style.cursor = '';
+  }
+});
 
 // Flags to avoid recursive scroll events
 let isSyncingEditorScroll = false;
