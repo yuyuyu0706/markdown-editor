@@ -81,6 +81,9 @@ textarea {
   font-size: 0.9rem;
   position: sticky;
   top: var(--header-offset, 0);
+  height: calc(100vh - var(--header-offset, 0));
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 
 #toc ul {

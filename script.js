@@ -9,6 +9,7 @@ const toolbar = document.getElementById('toolbar');
 
 let headings = [];
 let tocItems = [];
+let headingPositions = [];
 
 // Enable drag to resize between editor and preview
 let isDragging = false;
@@ -77,7 +78,6 @@ preview.addEventListener('scroll', () => {
     syncScroll(preview, editor);
   }
   isSyncingPreviewScroll = false;
-  updateTOCHighlight();
 });
 
 // プレビューを更新（Base64を抽出して表示）
@@ -99,20 +99,33 @@ function update() {
 }
 
 function buildTOC() {
+  const raw = editor.value;
+  const regex = /^(#{1,5})\s+(.*)$/gm;
+  const slugCounts = {};
+  headingPositions = [];
+  let match;
+  while ((match = regex.exec(raw)) !== null) {
+    const level = match[1].length;
+    const text = match[2].trim();
+    const base = text.toLowerCase().trim().replace(/[^\w]+/g, '-');
+    const count = slugCounts[base] || 0;
+    slugCounts[base] = count + 1;
+    const id = count ? `${base}-${count}` : base;
+    headingPositions.push({ level, text, id, start: match.index });
+  }
+
   const headingElements = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5'));
+  headingElements.forEach((h, i) => {
+    if (headingPositions[i]) {
+      h.id = headingPositions[i].id;
+    }
+  });
+
   const root = document.createElement('ul');
   const stack = [root];
   let currentLevel = 1;
 
-  headingElements.forEach(h => {
-    const level = parseInt(h.tagName.substring(1));
-    const text = h.textContent;
-    let id = h.id;
-    if (!id) {
-      id = text.toLowerCase().trim().replace(/[^\w]+/g, '-');
-      h.id = id;
-    }
-
+  headingPositions.forEach(({ level, text, id }) => {
     if (level > currentLevel) {
       for (let i = currentLevel; i < level; i++) {
         const ul = document.createElement('ul');
@@ -149,8 +162,18 @@ function buildTOC() {
     item.addEventListener('click', () => {
       const target = document.getElementById(item.dataset.target);
       if (target) {
-        const top = Math.max(target.offsetTop - getHeaderOffset(), 0);
+        const top =
+          target.getBoundingClientRect().top -
+          preview.getBoundingClientRect().top +
+          preview.scrollTop -
+          getHeaderOffset();
         preview.scrollTo({ top, behavior: 'smooth' });
+      }
+      const hp = headingPositions.find(h => h.id === item.dataset.target);
+      if (hp) {
+        editor.focus();
+        editor.selectionStart = editor.selectionEnd = hp.start;
+        updateTOCHighlight();
       }
     });
   });
@@ -159,27 +182,30 @@ function buildTOC() {
 }
 
 function updateTOCHighlight() {
-  if (!headings.length) return;
-  const scrollTop = preview.scrollTop + getHeaderOffset();
-  let currentId = headings[0].id;
-  for (const h of headings) {
-    if (h.offsetTop <= scrollTop + 10) {
-      currentId = h.id;
+  if (!headingPositions.length) return;
+  const pos = editor.selectionStart;
+  let currentId = headingPositions[0].id;
+  for (const hp of headingPositions) {
+    if (pos >= hp.start) {
+      currentId = hp.id;
+    } else {
+      break;
     }
   }
   tocItems.forEach(item => {
-    if (item.dataset.target === currentId) {
-      item.classList.add('active');
-    } else {
-      item.classList.remove('active');
-    }
+    item.classList.toggle('active', item.dataset.target === currentId);
   });
 }
 
 // Base64格納用マップ
 const imageMap = {};
 
-editor.addEventListener('input', update);
+editor.addEventListener('input', () => {
+  update();
+  updateTOCHighlight();
+});
+editor.addEventListener('keyup', updateTOCHighlight);
+editor.addEventListener('click', updateTOCHighlight);
 window.addEventListener('load', update);
 
 imageInput.addEventListener('change', event => {
