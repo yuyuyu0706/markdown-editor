@@ -95,6 +95,15 @@ textarea {
   font-weight: bold;
 }
 
+.mermaid {
+  overflow-x: auto;
+}
+
+.mermaid .label foreignObject > div {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 h1, h2, h3, h4, h5 {
   border-bottom: 1px solid #aac8ff;
   color: #0055aa;

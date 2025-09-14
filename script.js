@@ -14,7 +14,8 @@ let headingPositions = [];
 if (window.mermaid) {
   mermaid.initialize({
     startOnLoad: false,
-    flowchart: { htmlLabels: false, wrap: true }
+    securityLevel: 'loose',
+    flowchart: { htmlLabels: true, wrap: true }
   });
 }
 
