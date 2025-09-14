@@ -14,7 +14,7 @@ let headingPositions = [];
 if (window.mermaid) {
   mermaid.initialize({
     startOnLoad: false,
-    flowchart: { htmlLabels: false }
+    flowchart: { htmlLabels: false, wrap: true }
   });
 }
 
