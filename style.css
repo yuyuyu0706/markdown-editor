@@ -70,7 +70,7 @@ textarea {
   overflow-y: auto;
   background-color: #f6faff;
   border-right: 1px solid #aac8ff;
-  color: #777;
+  color: #88b4ff;
   font-size: 0.9rem;
   position: sticky;
   top: var(--header-offset, 0);
@@ -91,11 +91,11 @@ textarea {
 }
 
 #toc .toc-item.active {
-  color: #000;
+  color: #0055aa;
   font-weight: bold;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4, h5 {
   border-bottom: 1px solid #aac8ff;
   color: #0055aa;
 }
