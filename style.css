@@ -35,7 +35,7 @@ main {
 
 textarea {
   flex: none;
-  width: 50%;
+  width: 40%;
   height: 100%;
   padding: 1rem;
   border: none;
@@ -47,18 +47,12 @@ textarea {
   font-family: monospace;
 }
 
-#divider {
+#divider,
+#toc-divider {
   width: 5px;
   background-color: #c2dbff;
   cursor: col-resize;
   flex-shrink: 0;
-}
-
-#preview-container {
-  flex: none;
-  width: 50%;
-  height: 100%;
-  display: flex;
 }
 
 #preview {
@@ -71,12 +65,11 @@ textarea {
 }
 
 #toc {
-  width: 20%;
-  max-width: 200px;
+  width: 200px;
   padding: 1rem;
   overflow-y: auto;
   background-color: #f6faff;
-  border-left: 1px solid #aac8ff;
+  border-right: 1px solid #aac8ff;
   color: #777;
   font-size: 0.9rem;
   position: sticky;

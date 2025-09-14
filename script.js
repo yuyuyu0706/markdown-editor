@@ -1,41 +1,57 @@
 const editor = document.getElementById('editor');
 const preview = document.getElementById('preview');
 const divider = document.getElementById('divider');
+const tocDivider = document.getElementById('toc-divider');
 const mainContainer = document.querySelector('main');
 const imageInput = document.getElementById('imageInput');
 const toc = document.getElementById('toc');
-const previewContainer = document.getElementById('preview-container');
 const toolbar = document.getElementById('toolbar');
 
 let headings = [];
 let tocItems = [];
 let headingPositions = [];
 
-// Enable drag to resize between editor and preview
-let isDragging = false;
+// Enable drag to resize panes
+let isDraggingEditor = false;
+let isDraggingTOC = false;
 
-divider.addEventListener('mousedown', (e) => {
-  isDragging = true;
+divider.addEventListener('mousedown', e => {
+  isDraggingEditor = true;
   document.body.style.cursor = 'col-resize';
   e.preventDefault();
 });
 
-document.addEventListener('mousemove', (e) => {
-  if (!isDragging) return;
+tocDivider.addEventListener('mousedown', e => {
+  isDraggingTOC = true;
+  document.body.style.cursor = 'col-resize';
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
   const rect = mainContainer.getBoundingClientRect();
   const minWidth = 100;
-  const dividerWidth = divider.offsetWidth;
-  let newEditorWidth = e.clientX - rect.left;
-  const maxWidth = rect.width - dividerWidth - minWidth;
-  if (newEditorWidth < minWidth) newEditorWidth = minWidth;
-  if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
-  editor.style.width = `${newEditorWidth}px`;
-  previewContainer.style.width = `${rect.width - newEditorWidth - dividerWidth}px`;
+  if (isDraggingEditor) {
+    const tocWidth = toc.offsetWidth + tocDivider.offsetWidth;
+    const dividerWidth = divider.offsetWidth;
+    let newEditorWidth = e.clientX - rect.left - tocWidth;
+    const maxWidth = rect.width - tocWidth - dividerWidth - minWidth;
+    if (newEditorWidth < minWidth) newEditorWidth = minWidth;
+    if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
+    editor.style.width = `${newEditorWidth}px`;
+  } else if (isDraggingTOC) {
+    const dividerWidth = tocDivider.offsetWidth;
+    let newTocWidth = e.clientX - rect.left;
+    const maxWidth = rect.width - dividerWidth - divider.offsetWidth - editor.offsetWidth - minWidth;
+    if (newTocWidth < minWidth) newTocWidth = minWidth;
+    if (newTocWidth > maxWidth) newTocWidth = maxWidth;
+    toc.style.width = `${newTocWidth}px`;
+  }
 });
 
 document.addEventListener('mouseup', () => {
-  if (isDragging) {
-    isDragging = false;
+  if (isDraggingEditor || isDraggingTOC) {
+    isDraggingEditor = false;
+    isDraggingTOC = false;
     document.body.style.cursor = '';
   }
 });
