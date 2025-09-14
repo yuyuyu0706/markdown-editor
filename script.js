@@ -15,7 +15,7 @@ if (window.mermaid) {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'loose',
-    flowchart: { htmlLabels: true, wrap: true }
+    flowchart: { htmlLabels: false, wrap: true, useMaxWidth: false }
   });
 }
 
