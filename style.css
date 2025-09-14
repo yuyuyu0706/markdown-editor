@@ -101,7 +101,8 @@ textarea {
 
 .mermaid .label foreignObject > div {
   white-space: pre-wrap;
-  word-break: break-word;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 h1, h2, h3, h4, h5 {
