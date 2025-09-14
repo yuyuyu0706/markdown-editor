@@ -11,6 +11,21 @@ let headings = [];
 let tocItems = [];
 let headingPositions = [];
 
+if (window.mermaid) {
+  mermaid.initialize({ startOnLoad: false });
+}
+
+marked.use({
+  renderer: {
+    code(code, infostring) {
+      const lang = (infostring || '').trim().toLowerCase();
+      if (lang === 'mermaid') {
+        return `<div class="mermaid">${code}</div>`;
+      }
+    }
+  }
+});
+
 // Enable drag to resize panes
 let isDraggingEditor = false;
 let isDraggingTOC = false;
@@ -111,6 +126,13 @@ function update() {
   });
 
   preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false });
+  if (window.mermaid) {
+    try {
+      mermaid.run({ nodes: preview.querySelectorAll('.mermaid') });
+    } catch (e) {
+      console.error(e);
+    }
+  }
   buildTOC();
 }
 
