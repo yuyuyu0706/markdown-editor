@@ -5,6 +5,7 @@ const mainContainer = document.querySelector('main');
 const imageInput = document.getElementById('imageInput');
 const toc = document.getElementById('toc');
 const previewContainer = document.getElementById('preview-container');
+const toolbar = document.getElementById('toolbar');
 
 let headings = [];
 let tocItems = [];
@@ -41,6 +42,18 @@ document.addEventListener('mouseup', () => {
 // Flags to avoid recursive scroll events
 let isSyncingEditorScroll = false;
 let isSyncingPreviewScroll = false;
+
+function getHeaderOffset() {
+  return toolbar ? toolbar.offsetHeight : 0;
+}
+
+function adjustTOCPosition() {
+  const offset = getHeaderOffset();
+  document.documentElement.style.setProperty('--header-offset', offset + 'px');
+}
+
+window.addEventListener('load', adjustTOCPosition);
+window.addEventListener('resize', adjustTOCPosition);
 
 function syncScroll(source, target) {
   const sourceMax = source.scrollHeight - source.clientHeight;
@@ -136,7 +149,8 @@ function buildTOC() {
     item.addEventListener('click', () => {
       const target = document.getElementById(item.dataset.target);
       if (target) {
-        preview.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
+        const top = Math.max(target.offsetTop - getHeaderOffset(), 0);
+        preview.scrollTo({ top, behavior: 'smooth' });
       }
     });
   });
@@ -146,7 +160,7 @@ function buildTOC() {
 
 function updateTOCHighlight() {
   if (!headings.length) return;
-  const scrollTop = preview.scrollTop;
+  const scrollTop = preview.scrollTop + getHeaderOffset();
   let currentId = headings[0].id;
   for (const h of headings) {
     if (h.offsetTop <= scrollTop + 10) {

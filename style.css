@@ -79,6 +79,8 @@ textarea {
   border-left: 1px solid #aac8ff;
   color: #777;
   font-size: 0.9rem;
+  position: sticky;
+  top: var(--header-offset, 0);
 }
 
 #toc ul {
