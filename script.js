@@ -100,21 +100,38 @@ function update() {
 
 function buildTOC() {
   const raw = editor.value;
-  const regex = /^(#{1,5})\s+(.*)$/gm;
   const slugCounts = {};
   headingPositions = [];
-  let match;
-  while ((match = regex.exec(raw)) !== null) {
-    const level = match[1].length;
-    const text = match[2].trim();
-    const base = text.toLowerCase().trim().replace(/[^\w]+/g, '-');
-    const count = slugCounts[base] || 0;
-    slugCounts[base] = count + 1;
-    const id = count ? `${base}-${count}` : base;
-    headingPositions.push({ level, text, id, start: match.index });
+
+  // Collect heading lines while ignoring fenced code blocks
+  const lines = raw.split('\n');
+  let index = 0;
+  let inCode = false;
+  for (const line of lines) {
+    const fence = line.match(/^```/);
+    if (fence) {
+      inCode = !inCode;
+      index += line.length + 1;
+      continue;
+    }
+    if (!inCode) {
+      const m = line.match(/^(#{1,5})\s+(.*)$/);
+      if (m) {
+        const level = m[1].length;
+        const text = m[2].trim();
+        const base = text.toLowerCase().replace(/[^\w]+/g, '-');
+        const count = slugCounts[base] || 0;
+        slugCounts[base] = count + 1;
+        const id = count ? `${base}-${count}` : base;
+        headingPositions.push({ level, text, id, start: index });
+      }
+    }
+    index += line.length + 1;
   }
 
-  const headingElements = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5'));
+  const headingElements = Array.from(
+    preview.querySelectorAll('h1, h2, h3, h4, h5')
+  );
   headingElements.forEach((h, i) => {
     if (headingPositions[i]) {
       h.id = headingPositions[i].id;
@@ -159,7 +176,8 @@ function buildTOC() {
   headings = headingElements;
 
   tocItems.forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
       const target = document.getElementById(item.dataset.target);
       if (target) {
         const top =
