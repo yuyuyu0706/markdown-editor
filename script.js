@@ -19,13 +19,39 @@ if (window.mermaid) {
   });
 }
 
+function insertMermaidLineBreaks(code) {
+  function insertBreaks(text) {
+    let result = '';
+    let count = 0;
+    for (const ch of text) {
+      const w = ch.charCodeAt(0) > 0xff ? 2 : 1;
+      if (count + w > 22) {
+        result += '<br>';
+        count = 0;
+      }
+      result += ch;
+      count += w;
+    }
+    return result;
+  }
+  return code.replace(/\[([^\]]+)\]/g, (_, label) => `[${insertBreaks(label)}]`);
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 // Convert mermaid code fences to diagram containers
 marked.use({
   renderer: {
     code(code, infostring, escaped) {
       const lang = (infostring || '').trim().toLowerCase();
       if (lang === 'mermaid') {
-        return `<div class="mermaid">${code}</div>`;
+        const processed = insertMermaidLineBreaks(code);
+        return `<div class="mermaid">${escapeHtml(processed)}</div>`;
       }
       return false; // use default renderer
     }
@@ -138,7 +164,7 @@ function update() {
     const pre = block.parentElement;
     const div = document.createElement('div');
     div.className = 'mermaid';
-    div.textContent = block.textContent;
+    div.textContent = insertMermaidLineBreaks(block.textContent);
     pre.replaceWith(div);
   });
 
