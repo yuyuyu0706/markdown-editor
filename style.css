@@ -95,8 +95,11 @@ textarea {
   font-weight: bold;
 }
 
-.mermaid {
-  overflow-x: auto;
+
+#preview img,
+#preview .mermaid svg {
+  max-width: 100%;
+  height: auto;
 }
 
 .mermaid .label foreignObject > div {
