@@ -3,6 +3,11 @@ const preview = document.getElementById('preview');
 const divider = document.getElementById('divider');
 const mainContainer = document.querySelector('main');
 const imageInput = document.getElementById('imageInput');
+const toc = document.getElementById('toc');
+const previewContainer = document.getElementById('preview-container');
+
+let headings = [];
+let tocItems = [];
 
 // Enable drag to resize between editor and preview
 let isDragging = false;
@@ -23,7 +28,7 @@ document.addEventListener('mousemove', (e) => {
   if (newEditorWidth < minWidth) newEditorWidth = minWidth;
   if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
   editor.style.width = `${newEditorWidth}px`;
-  preview.style.width = `${rect.width - newEditorWidth - dividerWidth}px`;
+  previewContainer.style.width = `${rect.width - newEditorWidth - dividerWidth}px`;
 });
 
 document.addEventListener('mouseup', () => {
@@ -59,6 +64,7 @@ preview.addEventListener('scroll', () => {
     syncScroll(preview, editor);
   }
   isSyncingPreviewScroll = false;
+  updateTOCHighlight();
 });
 
 // プレビューを更新（Base64を抽出して表示）
@@ -75,7 +81,80 @@ function update() {
     }
   });
 
-  preview.innerHTML = marked.parse(expanded, { breaks: true });
+  const sluggerPreview = new marked.Slugger();
+  const sluggerTOC = new marked.Slugger();
+  preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false, slugger: sluggerPreview });
+  buildTOC(expanded, sluggerTOC);
+}
+
+function buildTOC(markdown, slugger) {
+  const tokens = marked.lexer(markdown);
+  const root = document.createElement('ul');
+  const stack = [root];
+  let currentLevel = 0;
+
+  tokens.forEach(token => {
+    if (token.type === 'heading' && token.depth <= 5) {
+      const level = token.depth;
+      const text = token.text;
+      const slug = slugger.slug(text);
+
+      if (level > currentLevel) {
+        for (let i = currentLevel; i < level; i++) {
+          const ul = document.createElement('ul');
+          stack[stack.length - 1].appendChild(ul);
+          stack.push(ul);
+        }
+      } else if (level < currentLevel) {
+        for (let i = currentLevel; i > level; i--) {
+          stack.pop();
+        }
+      }
+
+      const li = document.createElement('li');
+      li.className = 'toc-item';
+      li.dataset.target = slug;
+      li.textContent = text;
+      stack[stack.length - 1].appendChild(li);
+
+      currentLevel = level;
+    }
+  });
+
+  toc.innerHTML = '';
+  toc.appendChild(root);
+
+  tocItems = toc.querySelectorAll('.toc-item');
+  headings = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5'));
+
+  tocItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const target = document.getElementById(item.dataset.target);
+      if (target) {
+        preview.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
+      }
+    });
+  });
+
+  updateTOCHighlight();
+}
+
+function updateTOCHighlight() {
+  if (!headings.length) return;
+  const scrollTop = preview.scrollTop;
+  let currentId = headings[0].id;
+  for (const h of headings) {
+    if (h.offsetTop <= scrollTop + 10) {
+      currentId = h.id;
+    }
+  }
+  tocItems.forEach(item => {
+    if (item.dataset.target === currentId) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
 }
 
 // Base64格納用マップ

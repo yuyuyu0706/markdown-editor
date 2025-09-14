@@ -54,14 +54,47 @@ textarea {
   flex-shrink: 0;
 }
 
-#preview {
+#preview-container {
   flex: none;
   width: 50%;
+  height: 100%;
+  display: flex;
+}
+
+#preview {
+  flex: 1;
   height: 100%;
   padding: 1rem;
   overflow-y: auto;
   background-color: #f6faff;
   color: #002244;
+}
+
+#toc {
+  width: 20%;
+  max-width: 200px;
+  padding: 1rem;
+  overflow-y: auto;
+  background-color: #f6faff;
+  border-left: 1px solid #aac8ff;
+  color: #777;
+  font-size: 0.9rem;
+}
+
+#toc ul {
+  list-style: none;
+  padding-left: 1rem;
+  margin: 0;
+}
+
+#toc .toc-item {
+  cursor: pointer;
+  margin: 0.2rem 0;
+}
+
+#toc .toc-item.active {
+  color: #000;
+  font-weight: bold;
 }
 
 h1, h2, h3 {
