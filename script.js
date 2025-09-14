@@ -81,51 +81,56 @@ function update() {
     }
   });
 
-  const sluggerPreview = new marked.Slugger();
-  const sluggerTOC = new marked.Slugger();
-  preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false, slugger: sluggerPreview });
-  buildTOC(expanded, sluggerTOC);
+  preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false });
+  buildTOC();
 }
 
-function buildTOC(markdown, slugger) {
-  const tokens = marked.lexer(markdown);
+function buildTOC() {
+  const headingElements = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5'));
   const root = document.createElement('ul');
   const stack = [root];
-  let currentLevel = 0;
+  let currentLevel = 1;
 
-  tokens.forEach(token => {
-    if (token.type === 'heading' && token.depth <= 5) {
-      const level = token.depth;
-      const text = token.text;
-      const slug = slugger.slug(text);
-
-      if (level > currentLevel) {
-        for (let i = currentLevel; i < level; i++) {
-          const ul = document.createElement('ul');
-          stack[stack.length - 1].appendChild(ul);
-          stack.push(ul);
-        }
-      } else if (level < currentLevel) {
-        for (let i = currentLevel; i > level; i--) {
-          stack.pop();
-        }
-      }
-
-      const li = document.createElement('li');
-      li.className = 'toc-item';
-      li.dataset.target = slug;
-      li.textContent = text;
-      stack[stack.length - 1].appendChild(li);
-
-      currentLevel = level;
+  headingElements.forEach(h => {
+    const level = parseInt(h.tagName.substring(1));
+    const text = h.textContent;
+    let id = h.id;
+    if (!id) {
+      id = text.toLowerCase().trim().replace(/[^\w]+/g, '-');
+      h.id = id;
     }
+
+    if (level > currentLevel) {
+      for (let i = currentLevel; i < level; i++) {
+        const ul = document.createElement('ul');
+        const lastLi = stack[stack.length - 1].lastElementChild;
+        if (lastLi) {
+          lastLi.appendChild(ul);
+        } else {
+          stack[stack.length - 1].appendChild(ul);
+        }
+        stack.push(ul);
+      }
+    } else if (level < currentLevel) {
+      for (let i = currentLevel; i > level; i--) {
+        stack.pop();
+      }
+    }
+
+    const li = document.createElement('li');
+    li.className = 'toc-item';
+    li.dataset.target = id;
+    li.textContent = text;
+    stack[stack.length - 1].appendChild(li);
+
+    currentLevel = level;
   });
 
   toc.innerHTML = '';
   toc.appendChild(root);
 
   tocItems = toc.querySelectorAll('.toc-item');
-  headings = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5'));
+  headings = headingElements;
 
   tocItems.forEach(item => {
     item.addEventListener('click', () => {
