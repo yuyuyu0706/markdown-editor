@@ -2,6 +2,34 @@ const editor = document.getElementById('editor');
 const preview = document.getElementById('preview');
 const imageInput = document.getElementById('imageInput');
 
+// Flags to avoid recursive scroll events
+let isSyncingEditorScroll = false;
+let isSyncingPreviewScroll = false;
+
+function syncScroll(source, target) {
+  const sourceMax = source.scrollHeight - source.clientHeight;
+  const targetMax = target.scrollHeight - target.clientHeight;
+  if (sourceMax <= 0 || targetMax <= 0) return;
+  const ratio = source.scrollTop / sourceMax;
+  target.scrollTop = ratio * targetMax;
+}
+
+editor.addEventListener('scroll', () => {
+  if (!isSyncingEditorScroll) {
+    isSyncingPreviewScroll = true;
+    syncScroll(editor, preview);
+  }
+  isSyncingEditorScroll = false;
+});
+
+preview.addEventListener('scroll', () => {
+  if (!isSyncingPreviewScroll) {
+    isSyncingEditorScroll = true;
+    syncScroll(preview, editor);
+  }
+  isSyncingPreviewScroll = false;
+});
+
 // プレビューを更新（Base64を抽出して表示）
 function update() {
   const raw = editor.value;
