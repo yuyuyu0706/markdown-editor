@@ -6,6 +6,7 @@ const mainContainer = document.querySelector('main');
 const imageInput = document.getElementById('imageInput');
 const toc = document.getElementById('toc');
 const toolbar = document.getElementById('toolbar');
+const exportPdfBtn = document.getElementById('export-pdf');
 
 let headings = [];
 let tocItems = [];
@@ -330,5 +331,17 @@ imageInput.addEventListener('change', event => {
     update();
   };
   reader.readAsDataURL(file);
+});
+
+exportPdfBtn.addEventListener('click', () => {
+  const win = window.open('', '', 'width=800,height=600');
+  const cssHref = document.querySelector('link[rel="stylesheet"]').href;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview</title><link rel="stylesheet" href="${cssHref}"></head><body>${preview.innerHTML}</body></html>`);
+  win.document.close();
+  win.onload = () => {
+    win.focus();
+    win.print();
+    win.close();
+  };
 });
 
