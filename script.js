@@ -335,7 +335,8 @@ imageInput.addEventListener('change', event => {
 
 exportPdfBtn.addEventListener('click', () => {
   const win = window.open('', '', 'width=800,height=600');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview</title><link rel="stylesheet" href="style.css"></head><body>${preview.innerHTML}</body></html>`);
+  const cssHref = document.querySelector('link[rel="stylesheet"]').href;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview</title><link rel="stylesheet" href="${cssHref}"></head><body>${preview.innerHTML}</body></html>`);
   win.document.close();
   win.onload = () => {
     win.focus();
