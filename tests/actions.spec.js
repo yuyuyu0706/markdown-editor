@@ -1,0 +1,64 @@
+const { test, expect } = require('@playwright/test');
+const path = require('path');
+
+const fileUrl = 'file://' + path.resolve(__dirname, '../index.html');
+
+test('exports PDF via button', async ({ page }) => {
+  await page.goto(fileUrl);
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.click('#export-pdf'),
+  ]);
+  await popup.waitForEvent('close');
+  expect(popup.isClosed()).toBeTruthy();
+});
+
+test('inserts image into preview', async ({ page }) => {
+  await page.goto(fileUrl);
+  const buffer = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVR42mP8z/D/PwMDAwMAAAIABJACJ1gAAAAASUVORK5CYII=',
+    'base64'
+  );
+  await page.setInputFiles('#imageInput', {
+    name: 'test.png',
+    mimeType: 'image/png',
+    buffer,
+  });
+  await expect(page.locator('#editor')).toHaveValue(/\[画像: test.png\]/);
+  await expect(page.locator('#preview img')).toHaveAttribute('src', /data:image\/png;base64/);
+});
+
+test('divider can move horizontally', async ({ page }) => {
+  await page.goto(fileUrl);
+  const editor = page.locator('#editor');
+  const divider = page.locator('#divider');
+  const initialWidth = await editor.evaluate(e => e.offsetWidth);
+  const box = await divider.boundingBox();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 50, y);
+  await page.mouse.up();
+  const newWidth = await editor.evaluate(e => e.offsetWidth);
+  expect(newWidth).not.toBe(initialWidth);
+});
+
+test('saves markdown to file', async ({ page }) => {
+  await page.goto(fileUrl);
+  const filename = 'testfile.md';
+  page.once('dialog', dialog => dialog.accept(filename));
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#save-md'),
+  ]);
+  expect(download.suggestedFilename()).toBe(filename);
+});
+
+test('renders mermaid diagram in preview', async ({ page }) => {
+  await page.goto(fileUrl);
+  await page.waitForFunction(() => window.mermaid);
+  await page.fill('#editor', '```mermaid\nflowchart LR\nA-->B\n```');
+  await page.waitForSelector('#preview .mermaid svg');
+  await expect(page.locator('#preview .mermaid svg')).toBeVisible();
+});
