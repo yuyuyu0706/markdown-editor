@@ -5,11 +5,19 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html');
 
 test('exports PDF via button', async ({ page }) => {
   await page.goto(fileUrl);
+  await page.evaluate(() => {
+    const originalOpen = window.open;
+    window.open = (...args) => {
+      const win = originalOpen(...args);
+      win.print = () => {};
+      win.close = () => {};
+      return win;
+    };
+  });
   const [popup] = await Promise.all([
     page.waitForEvent('popup'),
     page.click('#export-pdf'),
   ]);
-  await popup.waitForLoadState();
   await expect(popup).toHaveTitle('Preview');
   await popup.close();
   expect(popup.isClosed()).toBeTruthy();
