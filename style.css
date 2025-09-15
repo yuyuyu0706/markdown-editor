@@ -27,21 +27,8 @@ body {
   background: #004488;
 }
 
-#export-pdf {
-  background: #0055aa;
-  color: white;
-  padding: 0.3rem 0.8rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  border: none;
-  margin-left: 0.5rem;
-}
-
-#export-pdf:hover {
-  background: #004488;
-}
-
+#export-pdf,
+#save-md,
 #help-btn {
   background: #0055aa;
   color: white;
@@ -53,6 +40,8 @@ body {
   margin-left: 0.5rem;
 }
 
+#export-pdf:hover,
+#save-md:hover,
 #help-btn:hover {
   background: #004488;
 }
