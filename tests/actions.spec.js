@@ -9,7 +9,9 @@ test('exports PDF via button', async ({ page }) => {
     page.waitForEvent('popup'),
     page.click('#export-pdf'),
   ]);
-  await popup.waitForEvent('close');
+  await popup.waitForLoadState();
+  await expect(popup).toHaveTitle('Preview');
+  await popup.close();
   expect(popup.isClosed()).toBeTruthy();
 });
 
