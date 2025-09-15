@@ -7,6 +7,7 @@ const imageInput = document.getElementById('imageInput');
 const toc = document.getElementById('toc');
 const toolbar = document.getElementById('toolbar');
 const exportPdfBtn = document.getElementById('export-pdf');
+const saveMdBtn = document.getElementById('save-md');
 const helpBtn = document.getElementById('help-btn');
 const helpWindow = document.getElementById('help-window');
 const helpClose = document.getElementById('help-close');
@@ -346,6 +347,19 @@ exportPdfBtn.addEventListener('click', () => {
     win.print();
     win.close();
   };
+});
+
+saveMdBtn.addEventListener('click', () => {
+  const filename = prompt('保存するファイル名を入力してください', 'document.md');
+  if (filename) {
+    const blob = new Blob([editor.value], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.endsWith('.md') ? filename : `${filename}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 });
 
 helpBtn.addEventListener('click', () => {
