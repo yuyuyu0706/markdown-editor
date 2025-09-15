@@ -13,6 +13,7 @@
       <input type="file" id="imageInput" accept="image/*" hidden>
     </label>
     <button id="export-pdf">📄 PDF出力</button>
+    <button id="help-btn">❔ ヘルプ</button>
   </div>
 
   <main>
@@ -25,6 +26,37 @@
     <div id="divider"></div>
     <div id="preview"></div>
   </main>
+
+  <div id="help-window" class="hidden">
+    <button id="help-close">✖</button>
+    <h3>Markdown チートシート</h3>
+    <pre>
+# 見出し1
+## 見出し2
+
+- リスト
+1. 番号付きリスト
+
+**太字** *斜体*
+> 引用
+`コード`
+
+```
+コードブロック
+```
+
+[リンク](URL)
+    </pre>
+    <h3>Mermaid チートシート</h3>
+    <pre>
+```mermaid
+graph TD
+  A[開始] --> B{条件}
+  B -->|はい| C[処理1]
+  B -->|いいえ| D[処理2]
+```
+    </pre>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>

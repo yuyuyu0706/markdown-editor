@@ -42,6 +42,21 @@ body {
   background: #004488;
 }
 
+#help-btn {
+  background: #0055aa;
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border: none;
+  margin-left: 0.5rem;
+}
+
+#help-btn:hover {
+  background: #004488;
+}
+
 main {
   display: flex;
   flex: 1;
@@ -140,6 +155,40 @@ code {
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
   color: #003366;
+}
+
+#help-window {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #aac8ff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  z-index: 1000;
+}
+
+#help-window.hidden {
+  display: none;
+}
+
+#help-window pre {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+#help-close {
+  float: right;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 a {
