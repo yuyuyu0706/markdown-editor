@@ -7,6 +7,9 @@ const imageInput = document.getElementById('imageInput');
 const toc = document.getElementById('toc');
 const toolbar = document.getElementById('toolbar');
 const exportPdfBtn = document.getElementById('export-pdf');
+const helpBtn = document.getElementById('help-btn');
+const helpWindow = document.getElementById('help-window');
+const helpClose = document.getElementById('help-close');
 
 let headings = [];
 let tocItems = [];
@@ -343,5 +346,13 @@ exportPdfBtn.addEventListener('click', () => {
     win.print();
     win.close();
   };
+});
+
+helpBtn.addEventListener('click', () => {
+  helpWindow.classList.toggle('hidden');
+});
+
+helpClose.addEventListener('click', () => {
+  helpWindow.classList.add('hidden');
 });
 
