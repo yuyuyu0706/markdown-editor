@@ -4,6 +4,7 @@ const divider = document.getElementById('divider');
 const tocDivider = document.getElementById('toc-divider');
 const mainContainer = document.querySelector('main');
 const imageInput = document.getElementById('imageInput');
+const insertImageBtn = document.getElementById('insert-image');
 const toc = document.getElementById('toc');
 const toolbar = document.getElementById('toolbar');
 const exportPdfBtn = document.getElementById('export-pdf');
@@ -11,6 +12,203 @@ const saveMdBtn = document.getElementById('save-md');
 const helpBtn = document.getElementById('help-btn');
 const helpWindow = document.getElementById('help-window');
 const helpClose = document.getElementById('help-close');
+const templateBtn = document.getElementById('template-btn');
+const templateOptions = document.getElementById('template-options');
+
+const templates = [
+  { label: '議事録', path: 'template/meeting-notes.md' },
+  { label: 'システム変更概要', path: 'template/system-change-overview.md' },
+  { label: 'システム変更チェックリスト', path: 'template/system-change-checklist.md' },
+  { label: 'Readme', path: 'template/readme.md' },
+  { label: 'リリースノート', path: 'template/release-notes.md' }
+];
+
+if (insertImageBtn && imageInput) {
+  insertImageBtn.addEventListener('click', () => {
+    imageInput.click();
+  });
+}
+
+if (templateBtn && templateOptions) {
+  const templateButtons = [];
+
+  templates.forEach(({ label, path }) => {
+    const optionBtn = document.createElement('button');
+    optionBtn.type = 'button';
+    optionBtn.className = 'template-option';
+    optionBtn.textContent = label;
+    optionBtn.dataset.path = path;
+    optionBtn.setAttribute('role', 'menuitem');
+    templateOptions.appendChild(optionBtn);
+    templateButtons.push(optionBtn);
+  });
+
+  let currentTemplateIndex = -1;
+
+  const focusOption = index => {
+    if (!templateButtons.length) return;
+    const normalizedIndex =
+      (index + templateButtons.length) % templateButtons.length;
+    const option = templateButtons[normalizedIndex];
+    if (option) {
+      option.focus();
+      currentTemplateIndex = normalizedIndex;
+    }
+  };
+
+  const openTemplateMenu = (startIndex = 0) => {
+    if (!templateButtons.length) return;
+    templateOptions.hidden = false;
+    templateBtn.setAttribute('aria-expanded', 'true');
+    focusOption(startIndex);
+  };
+
+  const closeTemplateMenu = () => {
+    if (templateOptions.hidden) return;
+    templateOptions.hidden = true;
+    templateBtn.setAttribute('aria-expanded', 'false');
+    currentTemplateIndex = -1;
+  };
+
+  const applyTemplate = async templatePath => {
+    if (!templatePath) return;
+
+    if (editor.value.trim() && !confirm('現在の内容をテンプレートで置き換えます。よろしいですか？')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(templatePath);
+      if (!response.ok) {
+        throw new Error(`Failed to load template: ${response.status}`);
+      }
+      const text = await response.text();
+      editor.value = text;
+      editor.selectionStart = editor.selectionEnd = 0;
+
+      if (typeof editor.focus === 'function') {
+        try {
+          editor.focus({ preventScroll: true });
+        } catch (err) {
+          editor.focus();
+        }
+      }
+
+      update();
+      adjustTOCPosition();
+      updateTOCHighlight();
+
+      const resetScrollPositions = () => {
+        editor.scrollTop = 0;
+        preview.scrollTop = 0;
+        if (toc) {
+          toc.scrollTop = 0;
+        }
+      };
+
+      resetScrollPositions();
+      requestAnimationFrame(resetScrollPositions);
+    } catch (error) {
+      console.error('テンプレートの読み込みに失敗しました', error);
+      alert('テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。');
+    }
+  };
+
+  templateBtn.addEventListener('click', () => {
+    if (templateOptions.hidden) {
+      openTemplateMenu();
+    } else {
+      closeTemplateMenu();
+    }
+  });
+
+  templateBtn.addEventListener('keydown', event => {
+    if (
+      event.key === 'ArrowDown' ||
+      event.key === 'ArrowUp' ||
+      event.key === 'Enter' ||
+      event.key === ' ' ||
+      event.key === 'Spacebar'
+    ) {
+      event.preventDefault();
+      if (templateOptions.hidden) {
+        const startIndex =
+          event.key === 'ArrowUp' && templateButtons.length
+            ? templateButtons.length - 1
+            : 0;
+        openTemplateMenu(startIndex);
+      }
+    } else if (event.key === 'Escape' && !templateOptions.hidden) {
+      event.preventDefault();
+      closeTemplateMenu();
+    }
+  });
+
+  templateOptions.addEventListener('focusin', event => {
+    const option = event.target.closest('.template-option');
+    if (!option) return;
+    currentTemplateIndex = templateButtons.indexOf(option);
+  });
+
+  templateOptions.addEventListener('keydown', event => {
+    if (!templateButtons.length) return;
+
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        focusOption(currentTemplateIndex + 1);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        focusOption(currentTemplateIndex - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusOption(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusOption(templateButtons.length - 1);
+        break;
+      case 'Escape':
+        event.preventDefault();
+        closeTemplateMenu();
+        templateBtn.focus();
+        break;
+      case 'Tab':
+        closeTemplateMenu();
+        break;
+      default:
+        break;
+    }
+  });
+
+  templateOptions.addEventListener('click', event => {
+    const option = event.target.closest('.template-option');
+    if (!option) return;
+    event.stopPropagation();
+    closeTemplateMenu();
+    applyTemplate(option.dataset.path);
+  });
+
+  document.addEventListener('click', event => {
+    if (
+      templateOptions.hidden ||
+      templateOptions.contains(event.target) ||
+      templateBtn.contains(event.target)
+    ) {
+      return;
+    }
+    closeTemplateMenu();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !templateOptions.hidden) {
+      closeTemplateMenu();
+      templateBtn.focus();
+    }
+  });
+}
 
 let headings = [];
 let tocItems = [];

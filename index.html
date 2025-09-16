@@ -2,20 +2,34 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Markdownエディタ（画像折りたたみ）</title>
+  <title>Markdown Editor Blue</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="./images/icons.png">
 </head>
 <body>
-  <div id="toolbar">
-    <label id="upload-label">
-      🖼 画像を挿入
-      <input type="file" id="imageInput" accept="image/*" hidden>
-    </label>
-    <button id="export-pdf">📄 PDF出力</button>
-    <button id="save-md">💾 保存</button>
-    <button id="help-btn">❔ ヘルプ</button>
-  </div>
+  <header id="toolbar">
+    <h1 id="app-title">Markdown Editor Blue</h1>
+    <div id="toolbar-actions">
+      <button id="save-md" class="toolbar-button" type="button">💾 保存</button>
+      <button id="export-pdf" class="toolbar-button" type="button">📄 PDF出力</button>
+      <button id="insert-image" class="toolbar-button" type="button">🖼 画像を挿入</button>
+      <div id="template-menu">
+        <button
+          id="template-btn"
+          class="toolbar-button"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="template-options"
+        >
+          📋 テンプレート
+        </button>
+        <div id="template-options" role="menu" aria-labelledby="template-btn" hidden></div>
+      </div>
+      <button id="help-btn" class="toolbar-button" type="button">❔ ヘルプ</button>
+    </div>
+    <input type="file" id="imageInput" accept="image/*" hidden>
+  </header>
 
   <main>
     <div id="toc"></div>
