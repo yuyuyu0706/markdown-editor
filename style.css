@@ -8,6 +8,10 @@ body {
 }
 
 #toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 1rem;
   background-color: #cde1ff;
   border-bottom: 1px solid #aac8ff;
@@ -29,7 +33,8 @@ body {
 
 #export-pdf,
 #save-md,
-#help-btn {
+#help-btn,
+#apply-template {
   background: #0055aa;
   color: white;
   padding: 0.3rem 0.8rem;
@@ -37,13 +42,39 @@ body {
   cursor: pointer;
   font-size: 0.9rem;
   border: none;
-  margin-left: 0.5rem;
 }
 
 #export-pdf:hover,
 #save-md:hover,
-#help-btn:hover {
+#help-btn:hover,
+#apply-template:hover {
   background: #004488;
+}
+
+#template-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#template-select {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #88b4ff;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #003366;
+  font-size: 0.9rem;
+}
+
+#template-select:focus {
+  outline: 2px solid #0055aa;
+  outline-offset: 1px;
+}
+
+#apply-template:disabled {
+  background: #aac8ff;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 main {

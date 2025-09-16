@@ -11,6 +11,56 @@ const saveMdBtn = document.getElementById('save-md');
 const helpBtn = document.getElementById('help-btn');
 const helpWindow = document.getElementById('help-window');
 const helpClose = document.getElementById('help-close');
+const templateSelect = document.getElementById('template-select');
+const applyTemplateBtn = document.getElementById('apply-template');
+
+const templates = [
+  { label: '議事録', path: 'template/meeting-notes.md' },
+  { label: 'システム変更概要', path: 'template/system-change-overview.md' },
+  { label: 'システム変更チェックリスト', path: 'template/system-change-checklist.md' },
+  { label: 'Readme', path: 'template/readme.md' },
+  { label: 'リリースノート', path: 'template/release-notes.md' }
+];
+
+if (templateSelect && applyTemplateBtn) {
+  templates.forEach(({ label, path }) => {
+    const option = document.createElement('option');
+    option.value = path;
+    option.textContent = label;
+    templateSelect.appendChild(option);
+  });
+
+  templateSelect.addEventListener('change', () => {
+    applyTemplateBtn.disabled = !templateSelect.value;
+  });
+
+  applyTemplateBtn.addEventListener('click', async () => {
+    const templatePath = templateSelect.value;
+    if (!templatePath) return;
+
+    if (editor.value.trim() && !confirm('現在の内容をテンプレートで置き換えます。よろしいですか？')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(templatePath);
+      if (!response.ok) {
+        throw new Error(`Failed to load template: ${response.status}`);
+      }
+      const text = await response.text();
+      editor.value = text;
+      editor.selectionStart = editor.selectionEnd = editor.value.length;
+      editor.focus();
+      update();
+      updateTOCHighlight();
+      editor.scrollTop = 0;
+      preview.scrollTop = 0;
+    } catch (error) {
+      console.error('テンプレートの読み込みに失敗しました', error);
+      alert('テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。');
+    }
+  });
+}
 
 let headings = [];
 let tocItems = [];
