@@ -69,7 +69,7 @@ body {
   border: 1px solid #aac8ff;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+  min-width: 240px;
   z-index: 1000;
 }
 
@@ -87,6 +87,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   width: 100%;
+  white-space: nowrap;
 }
 
 .template-option:hover,
@@ -176,7 +177,11 @@ textarea {
   overflow-wrap: anywhere;
 }
 
-h1, h2, h3, h4, h5 {
+#preview h1,
+#preview h2,
+#preview h3,
+#preview h4,
+#preview h5 {
   border-bottom: 1px solid #aac8ff;
   color: #0055aa;
 }

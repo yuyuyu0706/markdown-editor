@@ -84,12 +84,30 @@ if (templateBtn && templateOptions) {
       }
       const text = await response.text();
       editor.value = text;
-      editor.selectionStart = editor.selectionEnd = editor.value.length;
-      editor.focus();
+      editor.selectionStart = editor.selectionEnd = 0;
+
+      if (typeof editor.focus === 'function') {
+        try {
+          editor.focus({ preventScroll: true });
+        } catch (err) {
+          editor.focus();
+        }
+      }
+
       update();
+      adjustTOCPosition();
       updateTOCHighlight();
-      editor.scrollTop = 0;
-      preview.scrollTop = 0;
+
+      const resetScrollPositions = () => {
+        editor.scrollTop = 0;
+        preview.scrollTop = 0;
+        if (toc) {
+          toc.scrollTop = 0;
+        }
+      };
+
+      resetScrollPositions();
+      requestAnimationFrame(resetScrollPositions);
     } catch (error) {
       console.error('テンプレートの読み込みに失敗しました', error);
       alert('テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。');
