@@ -9,11 +9,13 @@ const toc = document.getElementById('toc');
 const toolbar = document.getElementById('toolbar');
 const exportPdfBtn = document.getElementById('export-pdf');
 const saveMdBtn = document.getElementById('save-md');
+const openMdBtn = document.getElementById('open-md');
 const helpBtn = document.getElementById('help-btn');
 const helpWindow = document.getElementById('help-window');
 const helpClose = document.getElementById('help-close');
 const templateBtn = document.getElementById('template-btn');
 const templateOptions = document.getElementById('template-options');
+const markdownInput = document.getElementById('markdownInput');
 
 const templates = [
   { label: '議事録', path: 'template/meeting-notes.md' },
@@ -26,6 +28,75 @@ const templates = [
 if (insertImageBtn && imageInput) {
   insertImageBtn.addEventListener('click', () => {
     imageInput.click();
+  });
+}
+
+if (openMdBtn && markdownInput) {
+  openMdBtn.addEventListener('click', () => {
+    markdownInput.click();
+  });
+
+  markdownInput.addEventListener('change', event => {
+    const [file] = event.target.files || [];
+    if (!file) {
+      return;
+    }
+
+    const shouldReplace =
+      !editor.value.trim() ||
+      confirm('現在の内容を開くファイルの内容で置き換えます。よろしいですか？');
+
+    if (!shouldReplace) {
+      markdownInput.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = loadEvent => {
+      const { result } = loadEvent.target || {};
+      if (typeof result !== 'string') {
+        markdownInput.value = '';
+        return;
+      }
+
+      editor.value = result;
+      editor.selectionStart = editor.selectionEnd = 0;
+
+      if (typeof editor.focus === 'function') {
+        try {
+          editor.focus({ preventScroll: true });
+        } catch (err) {
+          editor.focus();
+        }
+      }
+
+      update();
+      adjustTOCPosition();
+      updateTOCHighlight();
+
+      const resetScrollPositions = () => {
+        editor.scrollTop = 0;
+        preview.scrollTop = 0;
+        if (toc) {
+          toc.scrollTop = 0;
+        }
+      };
+
+      resetScrollPositions();
+      requestAnimationFrame(resetScrollPositions);
+      isPreviewManuallyPositioned = false;
+
+      markdownInput.value = '';
+    };
+
+    reader.onerror = () => {
+      console.error('Markdownファイルの読み込みに失敗しました');
+      alert('Markdownファイルの読み込みに失敗しました。ファイルを確認してください。');
+      markdownInput.value = '';
+    };
+
+    reader.readAsText(file, 'utf-8');
   });
 }
 
