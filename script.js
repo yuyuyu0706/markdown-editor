@@ -390,9 +390,7 @@ preview.addEventListener('scroll', () => {
 
 // プレビューを更新（Base64を抽出して表示）
 function update() {
-  previewScrollSuppressUntil =
-    performance.now() + PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION;
-
+  const renderStart = performance.now();
   const raw = editor.value;
 
   // Markdownにある <!-- image:filename --> ～ <!-- /image --> を展開
@@ -429,6 +427,14 @@ function update() {
     }
   }
   buildTOC();
+
+  const renderEnd = performance.now();
+  const renderDuration = renderEnd - renderStart;
+  previewScrollSuppressUntil =
+    renderEnd +
+    Math.max(PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION, renderDuration);
+
+  return renderDuration;
 }
 
 function buildTOC() {
@@ -558,7 +564,8 @@ editor.addEventListener('beforeinput', () => {
 
 editor.addEventListener('input', () => {
   extendEditorScrollSuppression();
-  update();
+  const renderDuration = update();
+  extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
   updateTOCHighlight();
 });
 
