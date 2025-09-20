@@ -108,6 +108,7 @@ if (templateBtn && templateOptions) {
 
       resetScrollPositions();
       requestAnimationFrame(resetScrollPositions);
+      isPreviewManuallyPositioned = false;
     } catch (error) {
       console.error('テンプレートの読み込みに失敗しました', error);
       alert('テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。');
@@ -294,6 +295,7 @@ let editorScrollSuppressUntil = 0;
 let previewScrollSuppressUntil = 0;
 const INPUT_SCROLL_SUPPRESS_DURATION = 400;
 const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
+let isPreviewManuallyPositioned = false;
 
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
@@ -323,6 +325,10 @@ editor.addEventListener('scroll', () => {
   }
 
   if (now < editorScrollSuppressUntil || now < previewScrollSuppressUntil) {
+    return;
+  }
+
+  if (isPreviewManuallyPositioned) {
     return;
   }
 
@@ -476,6 +482,7 @@ function buildTOC() {
           preview.scrollTop -
           getHeaderOffset();
         preview.scrollTo({ top, behavior: 'smooth' });
+        isPreviewManuallyPositioned = true;
       }
       const hp = headingPositions.find(h => h.id === item.dataset.target);
       if (hp) {
@@ -518,42 +525,49 @@ editor.addEventListener('input', () => {
   updateTOCHighlight();
 });
 
-const clearPreviewScrollSuppression = () => {
+const registerPreviewManualInteraction = () => {
   previewScrollSuppressUntil = 0;
+  isPreviewManuallyPositioned = true;
 };
 
-preview.addEventListener('wheel', clearPreviewScrollSuppression, { passive: true });
-preview.addEventListener('touchmove', clearPreviewScrollSuppression, {
+preview.addEventListener('wheel', registerPreviewManualInteraction, { passive: true });
+preview.addEventListener('touchmove', registerPreviewManualInteraction, {
   passive: true,
 });
-preview.addEventListener('touchstart', clearPreviewScrollSuppression, {
+preview.addEventListener('touchstart', registerPreviewManualInteraction, {
   passive: true,
 });
 preview.addEventListener('pointerdown', event => {
   if (event.pointerType !== 'mouse' || event.button !== 0) return;
   const rect = preview.getBoundingClientRect();
   if (event.clientX >= rect.right - 20) {
-    clearPreviewScrollSuppression();
+    registerPreviewManualInteraction();
   }
 });
 
-const clearEditorScrollSuppression = () => {
+const registerEditorManualInteraction = () => {
   editorScrollSuppressUntil = 0;
-  clearPreviewScrollSuppression();
+  previewScrollSuppressUntil = 0;
+  isPreviewManuallyPositioned = false;
 };
 
-editor.addEventListener('wheel', clearEditorScrollSuppression, { passive: true });
-editor.addEventListener('touchmove', clearEditorScrollSuppression, {
+editor.addEventListener('wheel', registerEditorManualInteraction, { passive: true });
+editor.addEventListener('touchmove', registerEditorManualInteraction, {
   passive: true,
 });
-editor.addEventListener('touchstart', clearEditorScrollSuppression, {
+editor.addEventListener('touchstart', registerEditorManualInteraction, {
   passive: true,
 });
 editor.addEventListener('pointerdown', event => {
   if (event.pointerType !== 'mouse' || event.button !== 0) return;
   const rect = editor.getBoundingClientRect();
   if (event.clientX >= rect.right - 20) {
-    clearEditorScrollSuppression();
+    registerEditorManualInteraction();
+  }
+});
+editor.addEventListener('keydown', event => {
+  if (event.key === 'PageDown' || event.key === 'PageUp') {
+    registerEditorManualInteraction();
   }
 });
 editor.addEventListener('keyup', updateTOCHighlight);
