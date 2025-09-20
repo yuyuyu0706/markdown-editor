@@ -291,7 +291,9 @@ document.addEventListener('mouseup', () => {
 let isSyncingEditorScroll = false;
 let isSyncingPreviewScroll = false;
 let editorScrollSuppressUntil = 0;
+let previewScrollSuppressUntil = 0;
 const INPUT_SCROLL_SUPPRESS_DURATION = 400;
+const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
 
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
@@ -329,15 +331,24 @@ editor.addEventListener('scroll', () => {
 });
 
 preview.addEventListener('scroll', () => {
-  if (!isSyncingPreviewScroll) {
-    isSyncingEditorScroll = true;
-    syncScroll(preview, editor);
+  if (isSyncingPreviewScroll) {
+    isSyncingPreviewScroll = false;
+    return;
   }
-  isSyncingPreviewScroll = false;
+
+  if (performance.now() < previewScrollSuppressUntil) {
+    return;
+  }
+
+  isSyncingEditorScroll = true;
+  syncScroll(preview, editor);
 });
 
 // プレビューを更新（Base64を抽出して表示）
 function update() {
+  previewScrollSuppressUntil =
+    performance.now() + PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION;
+
   const raw = editor.value;
 
   // Markdownにある <!-- image:filename --> ～ <!-- /image --> を展開
@@ -522,6 +533,25 @@ editor.addEventListener('pointerdown', event => {
   const rect = editor.getBoundingClientRect();
   if (event.clientX >= rect.right - 20) {
     clearEditorScrollSuppression();
+  }
+});
+
+const clearPreviewScrollSuppression = () => {
+  previewScrollSuppressUntil = 0;
+};
+
+preview.addEventListener('wheel', clearPreviewScrollSuppression, { passive: true });
+preview.addEventListener('touchmove', clearPreviewScrollSuppression, {
+  passive: true,
+});
+preview.addEventListener('touchstart', clearPreviewScrollSuppression, {
+  passive: true,
+});
+preview.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return;
+  const rect = preview.getBoundingClientRect();
+  if (event.clientX >= rect.right - 20) {
+    clearPreviewScrollSuppression();
   }
 });
 editor.addEventListener('keyup', updateTOCHighlight);
