@@ -316,12 +316,13 @@ function syncScroll(source, target) {
 }
 
 editor.addEventListener('scroll', () => {
+  const now = performance.now();
   if (isSyncingEditorScroll) {
     isSyncingEditorScroll = false;
     return;
   }
 
-  if (performance.now() < editorScrollSuppressUntil) {
+  if (now < editorScrollSuppressUntil || now < previewScrollSuppressUntil) {
     return;
   }
 
@@ -517,25 +518,6 @@ editor.addEventListener('input', () => {
   updateTOCHighlight();
 });
 
-const clearEditorScrollSuppression = () => {
-  editorScrollSuppressUntil = 0;
-};
-
-editor.addEventListener('wheel', clearEditorScrollSuppression, { passive: true });
-editor.addEventListener('touchmove', clearEditorScrollSuppression, {
-  passive: true,
-});
-editor.addEventListener('touchstart', clearEditorScrollSuppression, {
-  passive: true,
-});
-editor.addEventListener('pointerdown', event => {
-  if (event.pointerType !== 'mouse' || event.button !== 0) return;
-  const rect = editor.getBoundingClientRect();
-  if (event.clientX >= rect.right - 20) {
-    clearEditorScrollSuppression();
-  }
-});
-
 const clearPreviewScrollSuppression = () => {
   previewScrollSuppressUntil = 0;
 };
@@ -552,6 +534,26 @@ preview.addEventListener('pointerdown', event => {
   const rect = preview.getBoundingClientRect();
   if (event.clientX >= rect.right - 20) {
     clearPreviewScrollSuppression();
+  }
+});
+
+const clearEditorScrollSuppression = () => {
+  editorScrollSuppressUntil = 0;
+  clearPreviewScrollSuppression();
+};
+
+editor.addEventListener('wheel', clearEditorScrollSuppression, { passive: true });
+editor.addEventListener('touchmove', clearEditorScrollSuppression, {
+  passive: true,
+});
+editor.addEventListener('touchstart', clearEditorScrollSuppression, {
+  passive: true,
+});
+editor.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return;
+  const rect = editor.getBoundingClientRect();
+  if (event.clientX >= rect.right - 20) {
+    clearEditorScrollSuppression();
   }
 });
 editor.addEventListener('keyup', updateTOCHighlight);
