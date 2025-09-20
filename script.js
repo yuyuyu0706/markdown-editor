@@ -297,6 +297,13 @@ const INPUT_SCROLL_SUPPRESS_DURATION = 400;
 const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
 let isPreviewManuallyPositioned = false;
 
+function extendEditorScrollSuppression(duration = INPUT_SCROLL_SUPPRESS_DURATION) {
+  const targetTime = performance.now() + duration;
+  if (targetTime > editorScrollSuppressUntil) {
+    editorScrollSuppressUntil = targetTime;
+  }
+}
+
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
 }
@@ -516,14 +523,18 @@ function updateTOCHighlight() {
 const imageMap = {};
 
 editor.addEventListener('beforeinput', () => {
-  editorScrollSuppressUntil = performance.now() + INPUT_SCROLL_SUPPRESS_DURATION;
+  extendEditorScrollSuppression();
 });
 
 editor.addEventListener('input', () => {
-  editorScrollSuppressUntil = performance.now() + INPUT_SCROLL_SUPPRESS_DURATION;
+  extendEditorScrollSuppression();
   update();
   updateTOCHighlight();
 });
+
+editor.addEventListener('compositionstart', extendEditorScrollSuppression);
+editor.addEventListener('compositionupdate', extendEditorScrollSuppression);
+editor.addEventListener('compositionend', extendEditorScrollSuppression);
 
 const registerPreviewManualInteraction = () => {
   previewScrollSuppressUntil = 0;
@@ -568,7 +579,10 @@ editor.addEventListener('pointerdown', event => {
 editor.addEventListener('keydown', event => {
   if (event.key === 'PageDown' || event.key === 'PageUp') {
     registerEditorManualInteraction();
+    return;
   }
+
+  extendEditorScrollSuppression();
 });
 editor.addEventListener('keyup', updateTOCHighlight);
 editor.addEventListener('click', updateTOCHighlight);
