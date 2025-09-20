@@ -290,8 +290,8 @@ document.addEventListener('mouseup', () => {
 // Flags to avoid recursive scroll events
 let isSyncingEditorScroll = false;
 let isSyncingPreviewScroll = false;
-let lastEditorInputTime = 0;
-const INPUT_SCROLL_SUPPRESS_DURATION = 120;
+let editorScrollSuppressUntil = 0;
+const INPUT_SCROLL_SUPPRESS_DURATION = 400;
 
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
@@ -319,7 +319,7 @@ editor.addEventListener('scroll', () => {
     return;
   }
 
-  if (performance.now() - lastEditorInputTime < INPUT_SCROLL_SUPPRESS_DURATION) {
+  if (performance.now() < editorScrollSuppressUntil) {
     return;
   }
 
@@ -496,10 +496,33 @@ function updateTOCHighlight() {
 // Base64格納用マップ
 const imageMap = {};
 
+editor.addEventListener('beforeinput', () => {
+  editorScrollSuppressUntil = performance.now() + INPUT_SCROLL_SUPPRESS_DURATION;
+});
+
 editor.addEventListener('input', () => {
-  lastEditorInputTime = performance.now();
+  editorScrollSuppressUntil = performance.now() + INPUT_SCROLL_SUPPRESS_DURATION;
   update();
   updateTOCHighlight();
+});
+
+const clearEditorScrollSuppression = () => {
+  editorScrollSuppressUntil = 0;
+};
+
+editor.addEventListener('wheel', clearEditorScrollSuppression, { passive: true });
+editor.addEventListener('touchmove', clearEditorScrollSuppression, {
+  passive: true,
+});
+editor.addEventListener('touchstart', clearEditorScrollSuppression, {
+  passive: true,
+});
+editor.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return;
+  const rect = editor.getBoundingClientRect();
+  if (event.clientX >= rect.right - 20) {
+    clearEditorScrollSuppression();
+  }
 });
 editor.addEventListener('keyup', updateTOCHighlight);
 editor.addEventListener('click', updateTOCHighlight);
