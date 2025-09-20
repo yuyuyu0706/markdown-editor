@@ -218,26 +218,8 @@ if (window.mermaid) {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'loose',
-    flowchart: { htmlLabels: true, wrap: true }
+    flowchart: { htmlLabels: true }
   });
-}
-
-function insertMermaidLineBreaks(code) {
-  function insertBreaks(text) {
-    let result = '';
-    let count = 0;
-    for (const ch of text) {
-      const w = ch.charCodeAt(0) > 0xff ? 2 : 1;
-      if (count + w > 22) {
-        result += '<br>';
-        count = 0;
-      }
-      result += ch;
-      count += w;
-    }
-    return result;
-  }
-  return code.replace(/\[([^\]]+)\]/g, (_, label) => `[${insertBreaks(label)}]`);
 }
 
 function escapeHtml(str) {
@@ -253,8 +235,7 @@ marked.use({
     code(code, infostring, escaped) {
       const lang = (infostring || '').trim().toLowerCase();
       if (lang === 'mermaid') {
-        const processed = insertMermaidLineBreaks(code);
-        return `<div class="mermaid">${escapeHtml(processed)}</div>`;
+        return `<div class="mermaid">${escapeHtml(code)}</div>`;
       }
       return false; // use default renderer
     }
@@ -367,7 +348,7 @@ function update() {
     const pre = block.parentElement;
     const div = document.createElement('div');
     div.className = 'mermaid';
-    div.textContent = insertMermaidLineBreaks(block.textContent);
+    div.textContent = block.textContent;
     pre.replaceWith(div);
   });
 
