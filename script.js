@@ -290,6 +290,8 @@ document.addEventListener('mouseup', () => {
 // Flags to avoid recursive scroll events
 let isSyncingEditorScroll = false;
 let isSyncingPreviewScroll = false;
+let lastEditorInputTime = 0;
+const INPUT_SCROLL_SUPPRESS_DURATION = 120;
 
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
@@ -312,10 +314,17 @@ function syncScroll(source, target) {
 }
 
 editor.addEventListener('scroll', () => {
-  if (!isSyncingEditorScroll) {
-    isSyncingPreviewScroll = true;
-    syncScroll(editor, preview);
+  if (isSyncingEditorScroll) {
+    isSyncingEditorScroll = false;
+    return;
   }
+
+  if (performance.now() - lastEditorInputTime < INPUT_SCROLL_SUPPRESS_DURATION) {
+    return;
+  }
+
+  isSyncingPreviewScroll = true;
+  syncScroll(editor, preview);
   isSyncingEditorScroll = false;
 });
 
@@ -488,6 +497,7 @@ function updateTOCHighlight() {
 const imageMap = {};
 
 editor.addEventListener('input', () => {
+  lastEditorInputTime = performance.now();
   update();
   updateTOCHighlight();
 });
