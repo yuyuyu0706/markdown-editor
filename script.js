@@ -389,9 +389,33 @@ preview.addEventListener('scroll', () => {
 });
 
 // プレビューを更新（Base64を抽出して表示）
+function clampPreviewScrollTop(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const maxScrollTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
+  if (maxScrollTop <= 0) {
+    return 0;
+  }
+  if (value <= 0) {
+    return 0;
+  }
+  return Math.min(value, maxScrollTop);
+}
+
+function restorePreviewScrollPosition(targetScrollTop) {
+  const clamped = clampPreviewScrollTop(targetScrollTop);
+  const prevSuppressUntil = previewScrollSuppressUntil;
+  previewScrollSuppressUntil = Math.max(prevSuppressUntil, performance.now() + 50);
+  isSyncingPreviewScroll = true;
+  preview.scrollTop = clamped;
+  isSyncingPreviewScroll = false;
+}
+
 function update() {
   const renderStart = performance.now();
   const raw = editor.value;
+  const previousScrollTop = preview.scrollTop;
 
   // Markdownにある <!-- image:filename --> ～ <!-- /image --> を展開
   const expanded = raw.replace(/<!-- image:(.*?) -->\s*\n\[画像: .*?\]\s*\n<!-- \/image -->/g, (match, filename) => {
@@ -433,6 +457,11 @@ function update() {
   previewScrollSuppressUntil =
     renderEnd +
     Math.max(PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION, renderDuration);
+
+  const restore = () => restorePreviewScrollPosition(previousScrollTop);
+  restore();
+  requestAnimationFrame(restore);
+  requestAnimationFrame(() => requestAnimationFrame(restore));
 
   return renderDuration;
 }
