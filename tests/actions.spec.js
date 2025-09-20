@@ -65,6 +65,22 @@ test('saves markdown to file', async ({ page }) => {
   expect(download.suggestedFilename()).toBe(filename);
 });
 
+test('opens markdown file into editor', async ({ page }) => {
+  await page.goto(fileUrl);
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#open-md'),
+  ]);
+  page.once('dialog', dialog => dialog.accept());
+  await fileChooser.setFiles({
+    name: 'opened.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('# 開いたファイル', 'utf-8'),
+  });
+  await expect(page.locator('#editor')).toHaveValue('# 開いたファイル');
+  await expect(page.locator('#preview h1')).toHaveText('開いたファイル');
+});
+
 test('renders mermaid diagram in preview', async ({ page }) => {
   await page.goto(fileUrl);
   await page.waitForFunction(() => window.mermaid);

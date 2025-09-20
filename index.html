@@ -10,6 +10,7 @@
   <header id="toolbar">
     <h1 id="app-title">Markdown Editor Blue</h1>
     <div id="toolbar-actions">
+      <button id="open-md" class="toolbar-button" type="button">📂 開く</button>
       <button id="save-md" class="toolbar-button" type="button">💾 保存</button>
       <button id="export-pdf" class="toolbar-button" type="button">📄 PDF出力</button>
       <button id="insert-image" class="toolbar-button" type="button">🖼 画像を挿入</button>
@@ -29,6 +30,12 @@
       <button id="help-btn" class="toolbar-button" type="button">❔ ヘルプ</button>
     </div>
     <input type="file" id="imageInput" accept="image/*" hidden>
+    <input
+      type="file"
+      id="markdownInput"
+      accept=".md,.markdown,.txt,text/markdown"
+      hidden
+    >
   </header>
 
   <main>
