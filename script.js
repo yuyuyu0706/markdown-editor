@@ -295,6 +295,9 @@ let editorScrollSuppressUntil = 0;
 let previewScrollSuppressUntil = 0;
 const INPUT_SCROLL_SUPPRESS_DURATION = 400;
 const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
+const MANUAL_SCROLL_INTENT_DURATION = 1200;
+let editorManualScrollIntentUntil = 0;
+let isEditorScrollbarDragActive = false;
 let isPreviewManuallyPositioned = false;
 
 function extendEditorScrollSuppression(duration = INPUT_SCROLL_SUPPRESS_DURATION) {
@@ -302,10 +305,29 @@ function extendEditorScrollSuppression(duration = INPUT_SCROLL_SUPPRESS_DURATION
   if (targetTime > editorScrollSuppressUntil) {
     editorScrollSuppressUntil = targetTime;
   }
+  if (!isEditorScrollbarDragActive) {
+    editorManualScrollIntentUntil = 0;
+  }
 }
 
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
+}
+
+function registerEditorScrollIntent(duration = MANUAL_SCROLL_INTENT_DURATION) {
+  if (duration === Infinity) {
+    editorManualScrollIntentUntil = Infinity;
+    return;
+  }
+
+  if (editorManualScrollIntentUntil === Infinity) {
+    return;
+  }
+
+  const targetTime = performance.now() + duration;
+  if (targetTime > editorManualScrollIntentUntil) {
+    editorManualScrollIntentUntil = targetTime;
+  }
 }
 
 function adjustTOCPosition() {
@@ -328,6 +350,14 @@ editor.addEventListener('scroll', () => {
   const now = performance.now();
   if (isSyncingEditorScroll) {
     isSyncingEditorScroll = false;
+    return;
+  }
+
+  const hasManualIntent =
+    editorManualScrollIntentUntil === Infinity ||
+    now < editorManualScrollIntentUntil;
+
+  if (!hasManualIntent) {
     return;
   }
 
@@ -557,6 +587,7 @@ preview.addEventListener('pointerdown', event => {
 });
 
 const registerEditorManualInteraction = () => {
+  registerEditorScrollIntent();
   editorScrollSuppressUntil = 0;
   previewScrollSuppressUntil = 0;
   isPreviewManuallyPositioned = false;
@@ -573,11 +604,44 @@ editor.addEventListener('pointerdown', event => {
   if (event.pointerType !== 'mouse' || event.button !== 0) return;
   const rect = editor.getBoundingClientRect();
   if (event.clientX >= rect.right - 20) {
+    isEditorScrollbarDragActive = true;
+    registerEditorScrollIntent(Infinity);
     registerEditorManualInteraction();
   }
 });
+editor.addEventListener('blur', () => {
+  if (!isEditorScrollbarDragActive && editorManualScrollIntentUntil !== Infinity) {
+    editorManualScrollIntentUntil = 0;
+  }
+});
+document.addEventListener('pointerup', event => {
+  if (event.pointerType !== 'mouse' || !isEditorScrollbarDragActive) {
+    return;
+  }
+  isEditorScrollbarDragActive = false;
+  if (editorManualScrollIntentUntil === Infinity) {
+    editorManualScrollIntentUntil =
+      performance.now() + MANUAL_SCROLL_INTENT_DURATION;
+  }
+});
+document.addEventListener('pointercancel', event => {
+  if (event.pointerType !== 'mouse' || !isEditorScrollbarDragActive) {
+    return;
+  }
+  isEditorScrollbarDragActive = false;
+  if (editorManualScrollIntentUntil === Infinity) {
+    editorManualScrollIntentUntil = 0;
+  }
+});
 editor.addEventListener('keydown', event => {
-  if (event.key === 'PageDown' || event.key === 'PageUp') {
+  if (
+    event.key === 'PageDown' ||
+    event.key === 'PageUp' ||
+    event.key === 'Home' ||
+    event.key === 'End' ||
+    ((event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+      (event.metaKey || event.ctrlKey))
+  ) {
     registerEditorManualInteraction();
     return;
   }
