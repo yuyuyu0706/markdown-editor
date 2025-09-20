@@ -285,6 +285,7 @@ if (templateBtn && templateOptions) {
 let headings = [];
 let tocItems = [];
 let headingPositions = [];
+let previewTaskCheckboxMappings = [];
 
 if (window.mermaid) {
   mermaid.initialize({
@@ -499,6 +500,7 @@ function update() {
   });
 
   preview.innerHTML = marked.parse(expanded, { breaks: true, mangle: false });
+  updatePreviewTaskCheckboxes(raw);
 
   // Fallback: convert any remaining mermaid code blocks after parsing
   preview.querySelectorAll('pre code.language-mermaid').forEach(block => {
@@ -535,6 +537,93 @@ function update() {
   requestAnimationFrame(() => requestAnimationFrame(restore));
 
   return renderDuration;
+}
+
+function updatePreviewTaskCheckboxes(raw) {
+  previewTaskCheckboxMappings = [];
+  const lines = raw.split('\n');
+  let index = 0;
+  let inCode = false;
+  const taskPattern = /^(\s*)(?:[*+-]|\d+[.)])\s+\[( |x|X)\]/;
+
+  for (const line of lines) {
+    const fence = line.match(/^```/);
+    if (fence) {
+      inCode = !inCode;
+      index += line.length + 1;
+      continue;
+    }
+
+    if (!inCode && taskPattern.test(line)) {
+      const bracketIndex = line.indexOf('[');
+      if (bracketIndex !== -1) {
+        previewTaskCheckboxMappings.push({ index: index + bracketIndex + 1 });
+      }
+    }
+
+    index += line.length + 1;
+  }
+
+  const checkboxes = preview.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach((checkbox, idx) => {
+    const mapping = previewTaskCheckboxMappings[idx];
+    if (!mapping) {
+      checkbox.disabled = true;
+      delete checkbox.dataset.taskIndex;
+      return;
+    }
+
+    checkbox.disabled = false;
+    checkbox.dataset.taskIndex = String(idx);
+    checkbox.checked = raw.charAt(mapping.index).toLowerCase() === 'x';
+  });
+}
+
+function handlePreviewCheckboxChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
+    return;
+  }
+
+  const { taskIndex } = target.dataset;
+  if (taskIndex === undefined) {
+    return;
+  }
+
+  const mappingIndex = Number(taskIndex);
+  if (!Number.isInteger(mappingIndex) || mappingIndex < 0) {
+    return;
+  }
+
+  const mapping = previewTaskCheckboxMappings[mappingIndex];
+  if (!mapping) {
+    return;
+  }
+
+  const newChar = target.checked ? 'x' : ' ';
+  const currentValue = editor.value;
+
+  if (currentValue.charAt(mapping.index).toLowerCase() === newChar) {
+    return;
+  }
+
+  const prevSelectionStart = editor.selectionStart;
+  const prevSelectionEnd = editor.selectionEnd;
+  const prevScrollTop = editor.scrollTop;
+
+  editor.value =
+    currentValue.slice(0, mapping.index) +
+    newChar +
+    currentValue.slice(mapping.index + 1);
+
+  editor.scrollTop = prevScrollTop;
+  editor.selectionStart = prevSelectionStart;
+  editor.selectionEnd = prevSelectionEnd;
+
+  extendEditorScrollSuppression();
+  const renderDuration = update();
+  extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
+  updateTOCHighlight();
 }
 
 function buildTOC() {
@@ -692,6 +781,7 @@ preview.addEventListener('pointerdown', event => {
     registerPreviewManualInteraction();
   }
 });
+preview.addEventListener('change', handlePreviewCheckboxChange);
 
 const registerEditorManualInteraction = () => {
   registerEditorScrollIntent();
@@ -740,6 +830,83 @@ document.addEventListener('pointercancel', event => {
     editorManualScrollIntentUntil = 0;
   }
 });
+
+function continueListOnEnter(event) {
+  if (
+    event.key !== 'Enter' ||
+    event.shiftKey ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.isComposing
+  ) {
+    return false;
+  }
+
+  const { selectionStart, selectionEnd, value } = editor;
+
+  if (selectionStart !== selectionEnd) {
+    return false;
+  }
+
+  const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+  const beforeCursor = value.slice(lineStart, selectionStart);
+  const listMatch = beforeCursor.match(
+    /^(\s*)([*+-]|\d+[.)])\s+(\[(?: |x|X)\]\s*)?/
+  );
+
+  if (!listMatch) {
+    return false;
+  }
+
+  const nextNewlineIndex = value.indexOf('\n', selectionEnd);
+  const afterCursorWithinLine =
+    nextNewlineIndex === -1
+      ? value.slice(selectionEnd)
+      : value.slice(selectionEnd, nextNewlineIndex);
+  const fullLineContent = beforeCursor + afterCursorWithinLine;
+  const contentAfterMarker = fullLineContent.slice(listMatch[0].length);
+
+  if (!contentAfterMarker.trim()) {
+    return false;
+  }
+
+  event.preventDefault();
+  extendEditorScrollSuppression();
+
+  const indent = listMatch[1] || '';
+  const marker = listMatch[2];
+  const hasCheckbox = Boolean(listMatch[3]);
+  const orderedMatch = marker.match(/^(\d+)([.)])$/);
+  let nextMarker = marker;
+  if (orderedMatch) {
+    const nextNumber = Number(orderedMatch[1]) + 1;
+    nextMarker = `${nextNumber}${orderedMatch[2]}`;
+  }
+
+  let remainder = value.slice(selectionEnd);
+  if (remainder.startsWith(' ')) {
+    remainder = remainder.slice(1);
+  }
+
+  const checkboxSegment = hasCheckbox ? '[ ] ' : '';
+  const insertion = `\n${indent}${nextMarker} ${checkboxSegment}`;
+  const newValue =
+    value.slice(0, selectionStart) + insertion + remainder;
+
+  const newCursorPos = selectionStart + insertion.length;
+  const prevScrollTop = editor.scrollTop;
+
+  editor.value = newValue;
+  editor.scrollTop = prevScrollTop;
+  editor.selectionStart = editor.selectionEnd = newCursorPos;
+
+  const renderDuration = update();
+  extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
+  updateTOCHighlight();
+
+  return true;
+}
 editor.addEventListener('keydown', event => {
   if (
     event.key === 'PageDown' ||
@@ -750,6 +917,10 @@ editor.addEventListener('keydown', event => {
       (event.metaKey || event.ctrlKey))
   ) {
     registerEditorManualInteraction();
+    return;
+  }
+
+  if (continueListOnEnter(event)) {
     return;
   }
 
