@@ -108,6 +108,7 @@ if (templateBtn && templateOptions) {
 
       resetScrollPositions();
       requestAnimationFrame(resetScrollPositions);
+      isPreviewManuallyPositioned = false;
     } catch (error) {
       console.error('テンプレートの読み込みに失敗しました', error);
       alert('テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。');
@@ -290,9 +291,43 @@ document.addEventListener('mouseup', () => {
 // Flags to avoid recursive scroll events
 let isSyncingEditorScroll = false;
 let isSyncingPreviewScroll = false;
+let editorScrollSuppressUntil = 0;
+let previewScrollSuppressUntil = 0;
+const INPUT_SCROLL_SUPPRESS_DURATION = 400;
+const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
+const MANUAL_SCROLL_INTENT_DURATION = 1200;
+let editorManualScrollIntentUntil = 0;
+let isEditorScrollbarDragActive = false;
+let isPreviewManuallyPositioned = false;
+
+function extendEditorScrollSuppression(duration = INPUT_SCROLL_SUPPRESS_DURATION) {
+  const targetTime = performance.now() + duration;
+  if (targetTime > editorScrollSuppressUntil) {
+    editorScrollSuppressUntil = targetTime;
+  }
+  if (!isEditorScrollbarDragActive) {
+    editorManualScrollIntentUntil = 0;
+  }
+}
 
 function getHeaderOffset() {
   return toolbar ? toolbar.offsetHeight : 0;
+}
+
+function registerEditorScrollIntent(duration = MANUAL_SCROLL_INTENT_DURATION) {
+  if (duration === Infinity) {
+    editorManualScrollIntentUntil = Infinity;
+    return;
+  }
+
+  if (editorManualScrollIntentUntil === Infinity) {
+    return;
+  }
+
+  const targetTime = performance.now() + duration;
+  if (targetTime > editorManualScrollIntentUntil) {
+    editorManualScrollIntentUntil = targetTime;
+  }
 }
 
 function adjustTOCPosition() {
@@ -312,24 +347,75 @@ function syncScroll(source, target) {
 }
 
 editor.addEventListener('scroll', () => {
-  if (!isSyncingEditorScroll) {
-    isSyncingPreviewScroll = true;
-    syncScroll(editor, preview);
+  const now = performance.now();
+  if (isSyncingEditorScroll) {
+    isSyncingEditorScroll = false;
+    return;
   }
+
+  const hasManualIntent =
+    editorManualScrollIntentUntil === Infinity ||
+    now < editorManualScrollIntentUntil;
+
+  if (!hasManualIntent) {
+    return;
+  }
+
+  if (now < editorScrollSuppressUntil || now < previewScrollSuppressUntil) {
+    return;
+  }
+
+  if (isPreviewManuallyPositioned) {
+    return;
+  }
+
+  isSyncingPreviewScroll = true;
+  syncScroll(editor, preview);
   isSyncingEditorScroll = false;
 });
 
 preview.addEventListener('scroll', () => {
-  if (!isSyncingPreviewScroll) {
-    isSyncingEditorScroll = true;
-    syncScroll(preview, editor);
+  if (isSyncingPreviewScroll) {
+    isSyncingPreviewScroll = false;
+    return;
   }
-  isSyncingPreviewScroll = false;
+
+  if (performance.now() < previewScrollSuppressUntil) {
+    return;
+  }
+
+  isSyncingEditorScroll = true;
+  syncScroll(preview, editor);
 });
 
 // プレビューを更新（Base64を抽出して表示）
+function clampPreviewScrollTop(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const maxScrollTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
+  if (maxScrollTop <= 0) {
+    return 0;
+  }
+  if (value <= 0) {
+    return 0;
+  }
+  return Math.min(value, maxScrollTop);
+}
+
+function restorePreviewScrollPosition(targetScrollTop) {
+  const clamped = clampPreviewScrollTop(targetScrollTop);
+  const prevSuppressUntil = previewScrollSuppressUntil;
+  previewScrollSuppressUntil = Math.max(prevSuppressUntil, performance.now() + 50);
+  isSyncingPreviewScroll = true;
+  preview.scrollTop = clamped;
+  isSyncingPreviewScroll = false;
+}
+
 function update() {
+  const renderStart = performance.now();
   const raw = editor.value;
+  const previousScrollTop = preview.scrollTop;
 
   // Markdownにある <!-- image:filename --> ～ <!-- /image --> を展開
   const expanded = raw.replace(/<!-- image:(.*?) -->\s*\n\[画像: .*?\]\s*\n<!-- \/image -->/g, (match, filename) => {
@@ -365,6 +451,19 @@ function update() {
     }
   }
   buildTOC();
+
+  const renderEnd = performance.now();
+  const renderDuration = renderEnd - renderStart;
+  previewScrollSuppressUntil =
+    renderEnd +
+    Math.max(PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION, renderDuration);
+
+  const restore = () => restorePreviewScrollPosition(previousScrollTop);
+  restore();
+  requestAnimationFrame(restore);
+  requestAnimationFrame(() => requestAnimationFrame(restore));
+
+  return renderDuration;
 }
 
 function buildTOC() {
@@ -455,6 +554,7 @@ function buildTOC() {
           preview.scrollTop -
           getHeaderOffset();
         preview.scrollTo({ top, behavior: 'smooth' });
+        isPreviewManuallyPositioned = true;
       }
       const hp = headingPositions.find(h => h.id === item.dataset.target);
       if (hp) {
@@ -487,9 +587,102 @@ function updateTOCHighlight() {
 // Base64格納用マップ
 const imageMap = {};
 
+editor.addEventListener('beforeinput', () => {
+  extendEditorScrollSuppression();
+});
+
 editor.addEventListener('input', () => {
-  update();
+  extendEditorScrollSuppression();
+  const renderDuration = update();
+  extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
   updateTOCHighlight();
+});
+
+editor.addEventListener('compositionstart', extendEditorScrollSuppression);
+editor.addEventListener('compositionupdate', extendEditorScrollSuppression);
+editor.addEventListener('compositionend', extendEditorScrollSuppression);
+
+const registerPreviewManualInteraction = () => {
+  previewScrollSuppressUntil = 0;
+  isPreviewManuallyPositioned = true;
+};
+
+preview.addEventListener('wheel', registerPreviewManualInteraction, { passive: true });
+preview.addEventListener('touchmove', registerPreviewManualInteraction, {
+  passive: true,
+});
+preview.addEventListener('touchstart', registerPreviewManualInteraction, {
+  passive: true,
+});
+preview.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return;
+  const rect = preview.getBoundingClientRect();
+  if (event.clientX >= rect.right - 20) {
+    registerPreviewManualInteraction();
+  }
+});
+
+const registerEditorManualInteraction = () => {
+  registerEditorScrollIntent();
+  editorScrollSuppressUntil = 0;
+  previewScrollSuppressUntil = 0;
+  isPreviewManuallyPositioned = false;
+};
+
+editor.addEventListener('wheel', registerEditorManualInteraction, { passive: true });
+editor.addEventListener('touchmove', registerEditorManualInteraction, {
+  passive: true,
+});
+editor.addEventListener('touchstart', registerEditorManualInteraction, {
+  passive: true,
+});
+editor.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return;
+  const rect = editor.getBoundingClientRect();
+  if (event.clientX >= rect.right - 20) {
+    isEditorScrollbarDragActive = true;
+    registerEditorScrollIntent(Infinity);
+    registerEditorManualInteraction();
+  }
+});
+editor.addEventListener('blur', () => {
+  if (!isEditorScrollbarDragActive && editorManualScrollIntentUntil !== Infinity) {
+    editorManualScrollIntentUntil = 0;
+  }
+});
+document.addEventListener('pointerup', event => {
+  if (event.pointerType !== 'mouse' || !isEditorScrollbarDragActive) {
+    return;
+  }
+  isEditorScrollbarDragActive = false;
+  if (editorManualScrollIntentUntil === Infinity) {
+    editorManualScrollIntentUntil =
+      performance.now() + MANUAL_SCROLL_INTENT_DURATION;
+  }
+});
+document.addEventListener('pointercancel', event => {
+  if (event.pointerType !== 'mouse' || !isEditorScrollbarDragActive) {
+    return;
+  }
+  isEditorScrollbarDragActive = false;
+  if (editorManualScrollIntentUntil === Infinity) {
+    editorManualScrollIntentUntil = 0;
+  }
+});
+editor.addEventListener('keydown', event => {
+  if (
+    event.key === 'PageDown' ||
+    event.key === 'PageUp' ||
+    event.key === 'Home' ||
+    event.key === 'End' ||
+    ((event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+      (event.metaKey || event.ctrlKey))
+  ) {
+    registerEditorManualInteraction();
+    return;
+  }
+
+  extendEditorScrollSuppression();
 });
 editor.addEventListener('keyup', updateTOCHighlight);
 editor.addEventListener('click', updateTOCHighlight);
