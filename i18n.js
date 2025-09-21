@@ -452,6 +452,8 @@
       return currentLanguage;
     }
 
+    removeStoredLanguage();
+
     config = Object.assign({ defaultLanguage: 'en' }, window.APP_CONFIG || {});
 
     fallbackDictionary = await loadDictionary('en');
