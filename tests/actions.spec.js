@@ -56,13 +56,11 @@ test('divider can move horizontally', async ({ page }) => {
 
 test('saves markdown to file', async ({ page }) => {
   await page.goto(fileUrl);
-  const filename = 'testfile.md';
-  page.once('dialog', dialog => dialog.accept(filename));
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.click('#save-md'),
   ]);
-  expect(download.suggestedFilename()).toBe(filename);
+  expect(download.suggestedFilename()).toBe('document.md');
 });
 
 test('opens markdown file into editor', async ({ page }) => {
@@ -71,7 +69,6 @@ test('opens markdown file into editor', async ({ page }) => {
     page.waitForEvent('filechooser'),
     page.click('#open-md'),
   ]);
-  page.once('dialog', dialog => dialog.accept());
   await fileChooser.setFiles({
     name: 'opened.md',
     mimeType: 'text/markdown',
