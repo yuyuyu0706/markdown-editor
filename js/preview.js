@@ -180,6 +180,48 @@
     getStableEditorSelection();
   }
 
+  function focusEditor(preventScroll = true) {
+    if (!editorEl || typeof editorEl.focus !== 'function') {
+      return false;
+    }
+    try {
+      editorEl.focus({ preventScroll });
+    } catch (error) {
+      editorEl.focus();
+    }
+    return true;
+  }
+
+  function restoreEditorSelection(selection, scrollTop, valueLength, hadFocus) {
+    if (!editorEl) {
+      return;
+    }
+    const normalized = normalizeSelection(selection.start, selection.end, valueLength);
+    const applyState = () => {
+      editorEl.selectionStart = normalized.start;
+      editorEl.selectionEnd = normalized.end;
+      if (typeof scrollTop === 'number') {
+        editorEl.scrollTop = scrollTop;
+      }
+      rememberEditorSelection(normalized.start, normalized.end, valueLength);
+    };
+
+    applyState();
+
+    if (hadFocus) {
+      focusEditor();
+    }
+
+    if (typeof global.requestAnimationFrame === 'function') {
+      global.requestAnimationFrame(() => {
+        if (hadFocus) {
+          focusEditor();
+        }
+        applyState();
+      });
+    }
+  }
+
   function registerEditorScrollIntent(duration = MANUAL_SCROLL_INTENT_DURATION) {
     if (duration === Infinity) {
       editorManualScrollIntentUntil = Infinity;
@@ -401,19 +443,30 @@
       return;
     }
     const valueLength = currentValue.length;
-    const { start: prevSelectionStart, end: prevSelectionEnd } = getStableEditorSelection(
-      valueLength
-    );
+    const hadEditorFocus =
+      !!(global.document && editorEl && global.document.activeElement === editorEl);
+    const stableSelection = getStableEditorSelection(valueLength);
     const prevScrollTop = editorEl.scrollTop;
 
-    const nextValue =
-      currentValue.slice(0, mapping.index) + newChar + currentValue.slice(mapping.index + 1);
+    const replaceStart = mapping.index;
+    const replaceEnd = replaceStart + 1;
+    let nextValue = currentValue;
 
-    editorEl.value = nextValue;
-    editorEl.scrollTop = prevScrollTop;
-    editorEl.selectionStart = prevSelectionStart;
-    editorEl.selectionEnd = prevSelectionEnd;
-    rememberEditorSelection(prevSelectionStart, prevSelectionEnd, nextValue.length);
+    if (editorEl && typeof editorEl.setRangeText === 'function') {
+      try {
+        editorEl.setRangeText(newChar, replaceStart, replaceEnd, 'preserve');
+        nextValue = editorEl.value;
+      } catch (error) {
+        nextValue =
+          currentValue.slice(0, replaceStart) + newChar + currentValue.slice(replaceEnd);
+        editorEl.value = nextValue;
+      }
+    } else {
+      nextValue = currentValue.slice(0, replaceStart) + newChar + currentValue.slice(replaceEnd);
+      editorEl.value = nextValue;
+    }
+
+    restoreEditorSelection(stableSelection, prevScrollTop, nextValue.length, hadEditorFocus);
 
     extendEditorScrollSuppression();
     if (global.AppState && typeof global.AppState.setText === 'function') {
