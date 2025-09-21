@@ -2,6 +2,143 @@
   const LANGUAGE_STORAGE_KEY = 'markdown-editor-language';
   const LANGUAGE_SOURCE_STORAGE_KEY = 'markdown-editor-language-source';
   const SUPPORTED_LANGUAGES = ['en', 'ja'];
+  const BUILT_IN_DICTIONARIES = {
+    en: {
+      app: {
+        title: 'Markdown Editor Blue'
+      },
+      toolbar: {
+        open: '📂 Open',
+        save: '💾 Save',
+        exportPdf: '📄 Export PDF',
+        insertImage: '🖼 Insert Image',
+        template: '📋 Templates',
+        help: '❔ Help',
+        languageLabel: 'Language'
+      },
+      language: {
+        english: 'English',
+        japanese: '日本語'
+      },
+      templates: {
+        meetingNotes: 'Meeting Notes',
+        systemChangeOverview: 'System Change Overview',
+        systemChangeChecklist: 'System Change Checklist',
+        readme: 'Readme',
+        releaseNotes: 'Release Notes'
+      },
+      dialogs: {
+        replaceFile: 'Replace the current content with the selected file?',
+        fileReadErrorLog: 'Failed to load the Markdown file',
+        fileReadErrorAlert:
+          'Failed to load the Markdown file. Please check the file and try again.',
+        replaceTemplate: 'Replace the current content with the selected template?',
+        templateLoadErrorLog: 'Failed to load the template',
+        templateLoadErrorAlert:
+          'Failed to load the template. Please make sure the template files are available.',
+        saveFilenamePrompt: 'Enter a file name to save',
+        defaultFileName: 'document.md',
+        previewTitle: 'Preview'
+      },
+      editor: {
+        placeholder: 'Type Markdown here...'
+      },
+      help: {
+        close: 'Close',
+        markdownTitle: 'Markdown Cheat Sheet',
+        markdownCheatsheet:
+          '# Heading 1\n## Heading 2\n\n- List\n1. Numbered list\n\n**Bold** *Italic*\n> Quote\n`Code`\n\n```\nCode block\n```\n\n[Link](URL)',
+        mermaidTitle: 'Mermaid Cheat Sheet',
+        mermaidCheatsheet:
+          '```mermaid\ngraph TD\n  A[Start] --> B{Condition}\n  B -->|Yes| C[Process 1]\n  B -->|No| D[Process 2]\n```'
+      },
+      image: {
+        fallback: '[Image: {filename}]',
+        markdownTemplate:
+          '\n<!-- image:{filename} -->\n[Image: {filename}]\n<!-- /image -->\n'
+      }
+    },
+    ja: {
+      app: {
+        title: 'Markdown Editor Blue'
+      },
+      toolbar: {
+        open: '📂 開く',
+        save: '💾 保存',
+        exportPdf: '📄 PDF出力',
+        insertImage: '🖼 画像を挿入',
+        template: '📋 テンプレート',
+        help: '❔ ヘルプ',
+        languageLabel: '言語'
+      },
+      language: {
+        english: 'English',
+        japanese: '日本語'
+      },
+      templates: {
+        meetingNotes: '議事録',
+        systemChangeOverview: 'システム変更概要',
+        systemChangeChecklist: 'システム変更チェックリスト',
+        readme: 'Readme',
+        releaseNotes: 'リリースノート'
+      },
+      dialogs: {
+        replaceFile: '現在の内容を開くファイルの内容で置き換えます。よろしいですか？',
+        fileReadErrorLog: 'Markdownファイルの読み込みに失敗しました',
+        fileReadErrorAlert:
+          'Markdownファイルの読み込みに失敗しました。ファイルを確認してください。',
+        replaceTemplate: '現在の内容をテンプレートで置き換えます。よろしいですか？',
+        templateLoadErrorLog: 'テンプレートの読み込みに失敗しました',
+        templateLoadErrorAlert:
+          'テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。',
+        saveFilenamePrompt: '保存するファイル名を入力してください',
+        defaultFileName: 'document.md',
+        previewTitle: 'プレビュー'
+      },
+      editor: {
+        placeholder: 'ここにMarkdownを入力...'
+      },
+      help: {
+        close: '閉じる',
+        markdownTitle: 'Markdown チートシート',
+        markdownCheatsheet:
+          '# 見出し1\n## 見出し2\n\n- リスト\n1. 番号付きリスト\n\n**太字** *斜体*\n> 引用\n`コード`\n\n```\nコードブロック\n```\n\n[リンク](URL)',
+        mermaidTitle: 'Mermaid チートシート',
+        mermaidCheatsheet:
+          '```mermaid\ngraph TD\n  A[開始] --> B{条件}\n  B -->|はい| C[処理1]\n  B -->|いいえ| D[処理2]\n```'
+      },
+      image: {
+        fallback: '[画像: {filename}]',
+        markdownTemplate:
+          '\n<!-- image:{filename} -->\n[画像: {filename}]\n<!-- /image -->\n'
+      }
+    }
+  };
+
+  function cloneDictionary(dictionary) {
+    if (!dictionary) {
+      return null;
+    }
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(dictionary);
+      } catch (error) {
+        // Fallback to JSON-based cloning below if structuredClone fails.
+      }
+    }
+    return JSON.parse(JSON.stringify(dictionary));
+  }
+
+  const embeddedDictionaries = (() => {
+    const configDictionaries =
+      (window.APP_CONFIG && window.APP_CONFIG.embeddedDictionaries) || {};
+    return Object.assign({}, BUILT_IN_DICTIONARIES, configDictionaries);
+  })();
+
+  function getEmbeddedDictionary(lang) {
+    const dictionary = embeddedDictionaries[lang];
+    return dictionary ? cloneDictionary(dictionary) : null;
+  }
 
   let config = { defaultLanguage: 'en' };
   const dictionaries = new Map();
@@ -100,13 +237,36 @@
     if (dictionaries.has(lang)) {
       return dictionaries.get(lang);
     }
-    const response = await fetch(`i18n/${lang}.json`, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(`Failed to load dictionary: ${lang}`);
+
+    try {
+      const response = await fetch(`i18n/${lang}.json`, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Failed to load dictionary: ${lang}`);
+      }
+      const dict = await response.json();
+      dictionaries.set(lang, dict);
+      return dict;
+    } catch (error) {
+      const embedded = getEmbeddedDictionary(lang);
+      if (embedded) {
+        if (window.location && window.location.protocol === 'file:') {
+          console.info(`[i18n] Using embedded ${lang} dictionary for file protocol.`);
+        } else {
+          console.warn(`[i18n] Falling back to embedded ${lang} dictionary.`, error);
+        }
+        dictionaries.set(lang, embedded);
+        return embedded;
+      }
+
+      if (lang !== 'en') {
+        console.warn(`[i18n] Falling back to English dictionary for ${lang}.`, error);
+        const fallback = await loadDictionary('en');
+        dictionaries.set(lang, fallback);
+        return fallback;
+      }
+
+      throw error;
     }
-    const dict = await response.json();
-    dictionaries.set(lang, dict);
-    return dict;
   }
 
   function getMessage(dict, key) {
