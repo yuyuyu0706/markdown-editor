@@ -146,6 +146,7 @@
       fallbackDocText = nextText;
 
       safeRemoveItem(STORAGE_KEYS.text);
+      safeRemoveItem(STORAGE_KEYS.settings);
 
       state.docText = nextText;
       state.settings = mergeSettings(initial && initial.settings);

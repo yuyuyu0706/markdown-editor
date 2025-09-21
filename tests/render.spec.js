@@ -24,6 +24,7 @@ test.beforeEach(async ({ page }) => {
 test('does not persist the welcome note on first load', async ({ page }) => {
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
   await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
   await page.waitForFunction(
     () => window.localStorage.getItem('markdown-editor-language') === null
   );
@@ -49,6 +50,7 @@ test('reload resets to welcome note even after saving custom text', async ({ pag
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
   await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
   await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
 });
 
 test('ignores stored text that only contains invisible characters', async ({ page }) => {
@@ -61,6 +63,7 @@ test('ignores stored text that only contains invisible characters', async ({ pag
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
   await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
   await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
 });
 
 test('clears stored text when reloading immediately after emptying editor', async ({ page }) => {
@@ -76,6 +79,18 @@ test('clears stored text when reloading immediately after emptying editor', asyn
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
   await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
   await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
+});
+
+test('clears stored settings on reload', async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem('md:settings', JSON.stringify({ lang: 'ja', extra: true }));
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#lang-switch')).toHaveValue('en');
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
 });
 
 test('clears stored language preference on reload', async ({ page }) => {
@@ -92,6 +107,7 @@ test('clears stored language preference on reload', async ({ page }) => {
       window.localStorage.getItem('markdown-editor-language') === null &&
       window.localStorage.getItem('markdown-editor-language-source') === null
   );
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
 });
 
 test('initial language defaults to English', async ({ page }) => {
