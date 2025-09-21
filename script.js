@@ -417,6 +417,27 @@ function startApp() {
   let isEditorScrollbarDragActive = false;
   let isPreviewManuallyPositioned = false;
 
+  const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let prefersReducedMotion = reducedMotionQuery.matches;
+
+  const handleReducedMotionChange = event => {
+    prefersReducedMotion = event.matches;
+  };
+
+  if (typeof reducedMotionQuery.addEventListener === 'function') {
+    reducedMotionQuery.addEventListener('change', handleReducedMotionChange);
+  } else if (typeof reducedMotionQuery.addListener === 'function') {
+    reducedMotionQuery.addListener(handleReducedMotionChange);
+  }
+
+  if (typeof window.__lastPreviewScrollTarget === 'undefined') {
+    window.__lastPreviewScrollTarget = null;
+  }
+
+  function shouldReduceMotion() {
+    return prefersReducedMotion;
+  }
+
   function extendEditorScrollSuppression(duration = INPUT_SCROLL_SUPPRESS_DURATION) {
     const targetTime = performance.now() + duration;
     if (targetTime > editorScrollSuppressUntil) {
@@ -450,6 +471,30 @@ function startApp() {
   function adjustTOCPosition() {
     const offset = getHeaderOffset();
     document.documentElement.style.setProperty('--header-offset', offset + 'px');
+  }
+
+  function getPreviewPaddingTop() {
+    const padding = parseFloat(window.getComputedStyle(preview).paddingTop || '0');
+    return Number.isFinite(padding) ? padding : 0;
+  }
+
+  function computePreviewScrollTarget(element) {
+    const previewRect = preview.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const paddingTop = getPreviewPaddingTop();
+    const headerHeight = getHeaderOffset();
+    const relativeTop = elementRect.top - previewRect.top + preview.scrollTop;
+    const maxScroll = Math.max(preview.scrollHeight - preview.clientHeight, 0);
+    const targetTop = Math.min(
+      Math.max(relativeTop - headerHeight - paddingTop, 0),
+      maxScroll
+    );
+    return { targetTop, headerHeight, paddingTop };
+  }
+
+  function dispatchPreviewScrolled(detail) {
+    window.__lastPreviewScrollTarget = detail;
+    preview.dispatchEvent(new CustomEvent('preview:scrolled', { detail }));
   }
 
   function performInitialLayout() {
@@ -764,14 +809,39 @@ function startApp() {
       item.addEventListener('click', e => {
         e.stopPropagation();
         const target = document.getElementById(item.dataset.target);
-        if (target) {
-          const top =
-            target.getBoundingClientRect().top -
-            preview.getBoundingClientRect().top +
-            preview.scrollTop -
-            getHeaderOffset();
-          preview.scrollTo({ top, behavior: 'smooth' });
-          isPreviewManuallyPositioned = true;
+        if (!target) {
+          return;
+        }
+
+        const { targetTop, headerHeight, paddingTop } = computePreviewScrollTarget(target);
+        const difference = Math.abs(preview.scrollTop - targetTop);
+        const behavior = shouldReduceMotion() ? 'auto' : 'smooth';
+        const detail = {
+          id: item.dataset.target,
+          top: targetTop,
+          headerHeight,
+          paddingTop,
+        };
+        const notify = () => dispatchPreviewScrolled(detail);
+
+        isPreviewManuallyPositioned = true;
+
+        if (difference <= 1) {
+          requestAnimationFrame(notify);
+        } else {
+          preview.scrollTo({ top: targetTop, behavior });
+          if (behavior === 'auto') {
+            requestAnimationFrame(notify);
+          } else {
+            const waitForSettle = () => {
+              if (Math.abs(preview.scrollTop - targetTop) <= 1) {
+                notify();
+              } else {
+                requestAnimationFrame(waitForSettle);
+              }
+            };
+            waitForSettle();
+          }
         }
         const hp = headingPositions.find(h => h.id === item.dataset.target);
         if (hp) {
