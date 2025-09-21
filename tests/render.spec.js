@@ -225,6 +225,20 @@ test('preview checkbox interactions only update their markdown lines', async ({ 
 
   const getEditorLines = async () => (await editor.inputValue()).split('\n');
 
+  const focusEditor = async () => {
+    await page.evaluate(() => {
+      const editorEl = document.getElementById('editor');
+      if (!editorEl) {
+        return;
+      }
+      try {
+        editorEl.focus({ preventScroll: true });
+      } catch (error) {
+        editorEl.focus();
+      }
+    });
+  };
+
   const applyCheckboxState = (line, checked) => line.replace(/\[( |x|X)\]/, checked ? '[x]' : '[ ]');
 
   const defaultCaretColumnForLine = line => {
@@ -287,6 +301,7 @@ test('preview checkbox interactions only update their markdown lines', async ({ 
   const toggleAndAssert = async ({ checkboxLocator, lineIndex, expectedLine, expectedChecked }) => {
     const caretColumn = defaultCaretColumnForLine(currentLines[lineIndex]);
     await setCaretToLineColumn(lineIndex, caretColumn);
+    await focusEditor();
     const beforeSelection = await getSelectionRange();
     expect(beforeSelection).not.toBeNull();
 
@@ -311,6 +326,7 @@ test('preview checkbox interactions only update their markdown lines', async ({ 
     const afterEditorLines = await getEditorLines();
     assertOnlyLineChanged(previousLines, afterEditorLines, lineIndex, expectedLine);
 
+    await focusEditor();
     const afterSelection = await getSelectionRange();
     expect(afterSelection).not.toBeNull();
     expect(Math.abs(afterSelection.start - beforeSelection.start)).toBeLessThanOrEqual(
