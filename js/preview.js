@@ -18,6 +18,7 @@
 
   let imageMap = Object.create(null);
   let previewTaskCheckboxMappings = [];
+  let lastEditorSelection = { start: 0, end: 0 };
 
   let isSyncingEditorScroll = false;
   let isSyncingPreviewScroll = false;
@@ -118,6 +119,65 @@
     if (!isEditorScrollbarDragActive) {
       editorManualScrollIntentUntil = 0;
     }
+  }
+
+  function getEditorValueLength() {
+    if (!editorEl || typeof editorEl.value !== 'string') {
+      return 0;
+    }
+    return editorEl.value.length;
+  }
+
+  function normalizeSelection(start, end, valueLength) {
+    const max = Math.max(Number(valueLength) || 0, 0);
+    let normalizedStart = Number.isFinite(start) ? start : 0;
+    let normalizedEnd = Number.isFinite(end) ? end : normalizedStart;
+    if (normalizedStart < 0) {
+      normalizedStart = 0;
+    } else if (normalizedStart > max) {
+      normalizedStart = max;
+    }
+    if (normalizedEnd < 0) {
+      normalizedEnd = 0;
+    } else if (normalizedEnd > max) {
+      normalizedEnd = max;
+    }
+    if (normalizedEnd < normalizedStart) {
+      normalizedEnd = normalizedStart;
+    }
+    return { start: normalizedStart, end: normalizedEnd };
+  }
+
+  function rememberEditorSelection(start, end, valueLength) {
+    const length = valueLength === undefined ? getEditorValueLength() : valueLength;
+    lastEditorSelection = normalizeSelection(start, end, length);
+    return lastEditorSelection;
+  }
+
+  function getStableEditorSelection(valueLength) {
+    if (!editorEl) {
+      return { start: 0, end: 0 };
+    }
+    const activeElement = global.document && global.document.activeElement;
+    const length = valueLength === undefined ? getEditorValueLength() : valueLength;
+    if (activeElement === editorEl) {
+      const start = Number(editorEl.selectionStart);
+      const end = Number(editorEl.selectionEnd);
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        return rememberEditorSelection(start, end, length);
+      }
+    }
+    return normalizeSelection(lastEditorSelection.start, lastEditorSelection.end, length);
+  }
+
+  function handleDocumentSelectionChange() {
+    if (!editorEl) {
+      return;
+    }
+    if (global.document && global.document.activeElement !== editorEl) {
+      return;
+    }
+    getStableEditorSelection();
   }
 
   function registerEditorScrollIntent(duration = MANUAL_SCROLL_INTENT_DURATION) {
@@ -340,8 +400,10 @@
     if (currentValue.charAt(mapping.index).toLowerCase() === newChar) {
       return;
     }
-    const prevSelectionStart = editorEl.selectionStart;
-    const prevSelectionEnd = editorEl.selectionEnd;
+    const valueLength = currentValue.length;
+    const { start: prevSelectionStart, end: prevSelectionEnd } = getStableEditorSelection(
+      valueLength
+    );
     const prevScrollTop = editorEl.scrollTop;
 
     const nextValue =
@@ -351,6 +413,7 @@
     editorEl.scrollTop = prevScrollTop;
     editorEl.selectionStart = prevSelectionStart;
     editorEl.selectionEnd = prevSelectionEnd;
+    rememberEditorSelection(prevSelectionStart, prevSelectionEnd, nextValue.length);
 
     extendEditorScrollSuppression();
     if (global.AppState && typeof global.AppState.setText === 'function') {
@@ -531,6 +594,7 @@
     editorEl.addEventListener('keydown', handleEditorKeydown);
     global.document.addEventListener('pointerup', handleDocumentPointerUp);
     global.document.addEventListener('pointercancel', handleDocumentPointerCancel);
+    global.document.addEventListener('selectionchange', handleDocumentSelectionChange);
   }
 
   function attachBusListeners() {
@@ -681,6 +745,8 @@
     attachPreviewEvents();
     attachEditorEvents();
     attachBusListeners();
+
+    rememberEditorSelection(editorEl.selectionStart, editorEl.selectionEnd, getEditorValueLength());
 
     initialized = true;
     render(getInitialText());
