@@ -1,5 +1,6 @@
 (function () {
   const LANGUAGE_STORAGE_KEY = 'markdown-editor-language';
+  const LANGUAGE_SOURCE_STORAGE_KEY = 'markdown-editor-language-source';
   const SUPPORTED_LANGUAGES = ['en', 'ja'];
 
   let config = { defaultLanguage: 'en' };
@@ -34,10 +35,44 @@
     return 'en';
   }
 
+  function removeStoredLanguage() {
+    try {
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+      localStorage.removeItem(LANGUAGE_SOURCE_STORAGE_KEY);
+    } catch (error) {
+      console.warn('[i18n] Unable to clear stored language.', error);
+    }
+  }
+
+  function persistStoredLanguage(lang, source) {
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+      localStorage.setItem(LANGUAGE_SOURCE_STORAGE_KEY, source);
+    } catch (error) {
+      console.warn('[i18n] Unable to persist language selection.', error);
+    }
+  }
+
   function getStoredLanguage() {
     try {
       const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-      return normalizeLanguage(stored);
+      if (!stored) {
+        return null;
+      }
+
+      const normalized = normalizeLanguage(stored);
+      if (!normalized) {
+        removeStoredLanguage();
+        return null;
+      }
+
+      const source = localStorage.getItem(LANGUAGE_SOURCE_STORAGE_KEY) || '';
+      if (source !== 'user') {
+        removeStoredLanguage();
+        return null;
+      }
+
+      return { lang: normalized, source };
     } catch (error) {
       console.warn('[i18n] Unable to access localStorage.', error);
       return null;
@@ -180,28 +215,29 @@
     const params = new URLSearchParams(window.location.search);
     const queryLang = normalizeLanguage(params.get('lang'));
     if (queryLang && isSupported(queryLang)) {
-      return queryLang;
+      return { lang: queryLang, source: 'query' };
     }
 
-    const storedLang = getStoredLanguage();
-    if (storedLang && isSupported(storedLang)) {
-      return storedLang;
+    const stored = getStoredLanguage();
+    if (stored && isSupported(stored.lang)) {
+      return stored;
     }
 
     const defaultLang = getDefaultLanguage();
     if (defaultLang) {
-      return defaultLang;
+      return { lang: defaultLang, source: 'default' };
     }
 
     const browserLang = getBrowserLanguage();
     if (browserLang) {
-      return browserLang;
+      return { lang: browserLang, source: 'browser' };
     }
 
-    return 'en';
+    return { lang: 'en', source: 'fallback' };
   }
 
-  async function setLang(lang) {
+  async function setLang(lang, options = {}) {
+    const { persist } = options;
     const normalized = normalizeLanguage(lang) || getDefaultLanguage();
     const target = isSupported(normalized) ? normalized : getDefaultLanguage();
     if (target === currentLanguage && initialized) {
@@ -224,10 +260,9 @@
     currentDictionary = dictionary;
     document.documentElement.setAttribute('lang', currentLanguage);
 
-    try {
-      localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
-    } catch (error) {
-      console.warn('[i18n] Unable to persist language selection.', error);
+    const shouldPersist = typeof persist === 'boolean' ? persist : initialized;
+    if (shouldPersist) {
+      persistStoredLanguage(currentLanguage, options.source || 'user');
     }
 
     applyToDOM();
@@ -264,8 +299,11 @@
     currentLanguage = 'en';
     document.documentElement.setAttribute('lang', currentLanguage);
 
-    const initialLanguage = resolveInitialLanguage();
-    await setLang(initialLanguage);
+    const initialSelection = resolveInitialLanguage();
+    await setLang(initialSelection.lang, {
+      persist: false,
+      source: initialSelection.source
+    });
 
     initialized = true;
     return currentLanguage;
