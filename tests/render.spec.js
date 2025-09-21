@@ -8,8 +8,12 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1024 });
   await page.addInitScript(() => {
     try {
-      window.localStorage && window.localStorage.clear();
-      window.sessionStorage && window.sessionStorage.clear();
+      const storageClearedMarker = '__pw_storage_cleared__';
+      if (window.name !== storageClearedMarker) {
+        window.localStorage && window.localStorage.clear();
+        window.sessionStorage && window.sessionStorage.clear();
+        window.name = storageClearedMarker;
+      }
     } catch (error) {
       // Ignore storage access errors in test environment.
     }
@@ -21,18 +25,59 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('does not persist the welcome note on first load', async ({ page }) => {
-  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
-  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
-  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
-  await page.waitForFunction(
-    () => window.localStorage.getItem('markdown-editor-language') === null
-  );
-});
+test('startup shows Welcome and clears md:text (including empty/invisible values)', async ({
+  page,
+}) => {
+  const preview = page.locator('#preview');
+  const editor = page.locator('#editor');
 
-test('initial page renders welcome note in preview', async ({ page }) => {
-  await expect(page.locator('#editor')).toBeVisible();
-  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  const expectWelcomeState = async () => {
+    await expect(preview).toContainText('Welcome to Markdown Editor Blue');
+    await expect(editor).toHaveValue(/Welcome to Markdown Editor Blue/);
+    await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  };
+
+  await test.step('baseline startup renders Welcome and clears md:text', async () => {
+    await expect(editor).toBeVisible();
+    await expectWelcomeState();
+  });
+
+  const presetScenarios = [
+    { description: 'empty string in storage', value: '' },
+    { description: 'only invisible characters in storage', value: '\u200B\u200B\n\u200B' },
+    {
+      description: 'previously saved markdown in storage',
+      value: '# Draft from last time\n\n- line 1\n- line 2',
+    },
+  ];
+
+  for (const scenario of presetScenarios) {
+    await test.step(`startup resets when ${scenario.description}`, async () => {
+      await page.evaluate(value => {
+        window.localStorage.setItem('md:text', value);
+      }, scenario.value);
+
+      await page.reload({ waitUntil: 'load' });
+      await expectWelcomeState();
+
+      await test.step('subsequent reload without editing keeps Welcome state', async () => {
+        await page.reload({ waitUntil: 'load' });
+        await expectWelcomeState();
+      });
+
+      const typedText = `Temporary editor input after ${scenario.description}`;
+      await test.step('editing and reloading returns to Welcome and clears storage', async () => {
+        await page.fill('#editor', typedText);
+        await page.waitForFunction(
+          expected => window.localStorage.getItem('md:text') === expected,
+          typedText
+        );
+
+        await page.reload({ waitUntil: 'load' });
+        await expectWelcomeState();
+      });
+    });
+  }
 });
 
 test('reload resets to welcome note even after saving custom text', async ({ page }) => {
