@@ -31,17 +31,20 @@ test('initial page renders welcome note in preview', async ({ page }) => {
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
 });
 
-test('falls back to welcome note when stored text is empty', async ({ page }) => {
-  await page.evaluate(() => {
-    window.localStorage.setItem('md:text', '');
-  });
+test('reload resets to welcome note even after saving custom text', async ({ page }) => {
+  const customText = 'Stored note across reload';
+  await page.fill('#editor', customText);
+  await page.waitForFunction(text => window.AppState.getText() === text, customText);
+  await page.waitForTimeout(400);
+  await page.waitForFunction(
+    text => window.localStorage.getItem('md:text') === text,
+    customText
+  );
 
   await page.reload();
 
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
-  await expect(page.locator('#editor')).toHaveValue(
-    /Welcome to Markdown Editor Blue/
-  );
+  await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
   await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
 });
 

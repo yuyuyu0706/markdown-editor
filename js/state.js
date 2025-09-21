@@ -142,21 +142,13 @@
      */
     init(initial) {
       const initialText = initial && typeof initial.text === 'string' ? initial.text : '';
-      const { normalized: initialNormalized } = analyzeText(initialText);
-      fallbackDocText = initialNormalized;
+      const nextText = normalizeText(initialText);
+      fallbackDocText = nextText;
 
-      const storedText = safeGetItem(STORAGE_KEYS.text);
-      const { normalized: storedNormalized, hasMeaningful: storedHasMeaning } =
-        analyzeText(storedText);
-      const useStoredText = storedHasMeaning && storedNormalized !== fallbackDocText;
-      const nextText = useStoredText ? storedNormalized : fallbackDocText;
+      safeRemoveItem(STORAGE_KEYS.text);
 
       state.docText = nextText;
       state.settings = mergeSettings(initial && initial.settings);
-
-      if (!useStoredText && storedText !== null) {
-        safeRemoveItem(STORAGE_KEYS.text);
-      }
 
       scheduleTextPersist(state.docText);
       Bus.emit('text:changed', { text: state.docText, source: 'init' });
