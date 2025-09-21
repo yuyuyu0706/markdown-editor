@@ -4,6 +4,8 @@ const path = require('path');
 const fileUrl = 'file://' + path.resolve(__dirname, '../index.html');
 
 test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1280, height: 1024 });
   await page.addInitScript(() => {
     try {
       window.localStorage && window.localStorage.clear();
@@ -11,8 +13,12 @@ test.beforeEach(async ({ page }) => {
     } catch (error) {
       // Ignore storage access errors in test environment.
     }
+    window.__lastPreviewScrollTarget = null;
   });
   await page.goto(fileUrl);
+  await page.addStyleTag({
+    content: `html, body, #preview { scroll-behavior: auto !important; }`,
+  });
 });
 
 test('initial page renders welcome note in preview', async ({ page }) => {
@@ -82,25 +88,37 @@ test('preview retains manual scroll position while editing', async ({ page }) =>
 
 test('table of contents navigation scrolls to selected section', async ({ page }) => {
   const markdown = ['# TOC Test'];
-  for (let i = 1; i <= 8; i += 1) {
-    markdown.push(`\n## Jump Section ${i}\n\nDetails for section ${i}.`);
+  for (let i = 1; i <= 20; i += 1) {
+    markdown.push(
+      `\n## Jump Section ${i}\n\n` +
+        'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(8) +
+        '\n\n' +
+        'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '.repeat(6)
+    );
   }
   await page.fill('#editor', markdown.join('\n'));
 
-  const targetLabel = 'Jump Section 5';
+  const targetLabel = 'Jump Section 15';
   const targetSlug = targetLabel
     .toLowerCase()
     .trim()
     .replace(/[^\w]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+  await page.waitForFunction(slug => {
+    return document.querySelector(`#toc .toc-item[data-target="${slug}"]`);
+  }, targetSlug);
+
   const tocItem = page.locator(`#toc .toc-item[data-target="${targetSlug}"]`).first();
   await expect(tocItem).toBeVisible();
   await tocItem.click();
 
-  await page.waitForFunction(label => {
+  await page.waitForFunction((label, tolerance) => {
     const previewEl = document.getElementById('preview');
     const toolbar = document.getElementById('toolbar');
-    const headerOffset = toolbar ? toolbar.offsetHeight : 0;
+    if (!previewEl || !toolbar) {
+      return false;
+    }
     const slug = label
       .toLowerCase()
       .trim()
@@ -110,9 +128,17 @@ test('table of contents navigation scrolls to selected section', async ({ page }
     if (!heading) {
       return false;
     }
-    const diff = heading.getBoundingClientRect().top - previewEl.getBoundingClientRect().top;
-    return Math.abs(diff - headerOffset) < 3;
-  }, targetLabel);
+    const paddingTop = parseFloat(getComputedStyle(previewEl).paddingTop || '0') || 0;
+    const expectedOffset = toolbar.offsetHeight + paddingTop;
+    const previewRect = previewEl.getBoundingClientRect();
+    const headingRect = heading.getBoundingClientRect();
+    const relativeTop = headingRect.top - previewRect.top;
+    const scrollInfo = window.__lastPreviewScrollTarget;
+    if (!scrollInfo || scrollInfo.id !== slug) {
+      return false;
+    }
+    return Math.abs(relativeTop - expectedOffset) <= tolerance;
+  }, targetLabel, 10);
 });
 
 test('help window can be opened and closed', async ({ page }) => {
