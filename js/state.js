@@ -72,6 +72,23 @@
     }, TEXT_SAVE_DEBOUNCE);
   }
 
+  function flushPendingTextPersist() {
+    if (!textSaveTimer) {
+      return;
+    }
+    global.clearTimeout(textSaveTimer);
+    textSaveTimer = null;
+    persistTextValue(state.docText);
+  }
+
+  if (typeof global.addEventListener === 'function') {
+    const persistOnUnload = () => {
+      flushPendingTextPersist();
+    };
+    global.addEventListener('beforeunload', persistOnUnload, { capture: true });
+    global.addEventListener('pagehide', persistOnUnload, { capture: true });
+  }
+
   function readStoredSettings() {
     const raw = safeGetItem(STORAGE_KEYS.settings);
     if (!raw) {

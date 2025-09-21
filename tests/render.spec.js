@@ -41,6 +41,22 @@ test('falls back to welcome note when stored text is empty', async ({ page }) =>
   expect(storedValue).toBeNull();
 });
 
+test('clears stored text when reloading immediately after emptying editor', async ({ page }) => {
+  await page.fill('#editor', 'Personal draft');
+  await page.waitForFunction(() => window.AppState.getText() === 'Personal draft');
+  await page.waitForTimeout(400);
+
+  await page.fill('#editor', '');
+  await page.waitForFunction(() => window.AppState.getText() === '');
+
+  await page.reload();
+
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
+  const storedValue = await page.evaluate(() => window.localStorage.getItem('md:text'));
+  expect(storedValue).not.toBe('Personal draft');
+});
+
 test('initial language defaults to English', async ({ page }) => {
   await expect(page.locator('#lang-switch')).toHaveValue('en');
   await expect(page.locator('#open-md')).toHaveText('📂 Open');
