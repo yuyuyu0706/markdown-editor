@@ -88,7 +88,12 @@ test('table of contents navigation scrolls to selected section', async ({ page }
   await page.fill('#editor', markdown.join('\n'));
 
   const targetLabel = 'Jump Section 5';
-  const tocItem = page.locator('#toc .toc-item', { hasText: targetLabel });
+  const targetSlug = targetLabel
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const tocItem = page.locator(`#toc .toc-item[data-target="${targetSlug}"]`).first();
   await expect(tocItem).toBeVisible();
   await tocItem.click();
 
