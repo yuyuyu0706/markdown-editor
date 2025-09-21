@@ -18,7 +18,9 @@
   };
 
   const TEXT_SAVE_DEBOUNCE = 300;
+  const INERT_TEXT_PATTERN = /[\s\u200B\u200C\u200D\uFEFF]+/g;
   let textSaveTimer = null;
+  let fallbackDocText = '';
 
   function isPlainObject(value) {
     return Object.prototype.toString.call(value) === '[object Object]';
@@ -41,18 +43,59 @@
     }
   }
 
+  function safeRemoveItem(key) {
+    try {
+      global.localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('[AppState] Unable to remove from localStorage.', error);
+    }
+  }
+
+  function analyzeText(rawText) {
+    const normalized = normalizeText(rawText);
+    const stripped = normalized.replace(INERT_TEXT_PATTERN, '');
+    const hasMeaningful = stripped.length > 0;
+    return { normalized, hasMeaningful };
+  }
+
+  function persistTextValue(text) {
+    const { normalized, hasMeaningful } = analyzeText(text);
+    if (!hasMeaningful || (fallbackDocText && normalized === fallbackDocText)) {
+      safeRemoveItem(STORAGE_KEYS.text);
+      return;
+    }
+    safeSetItem(STORAGE_KEYS.text, normalized);
+  }
+
   function scheduleTextPersist(text) {
     if (typeof global.setTimeout !== 'function') {
-      safeSetItem(STORAGE_KEYS.text, text);
+      persistTextValue(text);
       return;
     }
     if (textSaveTimer) {
       global.clearTimeout(textSaveTimer);
     }
     textSaveTimer = global.setTimeout(() => {
-      safeSetItem(STORAGE_KEYS.text, text);
+      persistTextValue(text);
       textSaveTimer = null;
     }, TEXT_SAVE_DEBOUNCE);
+  }
+
+  function flushPendingTextPersist() {
+    if (!textSaveTimer) {
+      return;
+    }
+    global.clearTimeout(textSaveTimer);
+    textSaveTimer = null;
+    persistTextValue(state.docText);
+  }
+
+  if (typeof global.addEventListener === 'function') {
+    const persistOnUnload = () => {
+      flushPendingTextPersist();
+    };
+    global.addEventListener('beforeunload', persistOnUnload, { capture: true });
+    global.addEventListener('pagehide', persistOnUnload, { capture: true });
   }
 
   function readStoredSettings() {
@@ -99,10 +142,13 @@
      */
     init(initial) {
       const initialText = initial && typeof initial.text === 'string' ? initial.text : '';
-      const storedText = safeGetItem(STORAGE_KEYS.text);
-      const nextText = storedText !== null ? storedText : initialText;
+      const nextText = normalizeText(initialText);
+      fallbackDocText = nextText;
 
-      state.docText = normalizeText(nextText);
+      safeRemoveItem(STORAGE_KEYS.text);
+      safeRemoveItem(STORAGE_KEYS.settings);
+
+      state.docText = nextText;
       state.settings = mergeSettings(initial && initial.settings);
 
       scheduleTextPersist(state.docText);

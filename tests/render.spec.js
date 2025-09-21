@@ -21,9 +21,93 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('does not persist the welcome note on first load', async ({ page }) => {
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
+  await page.waitForFunction(
+    () => window.localStorage.getItem('markdown-editor-language') === null
+  );
+});
+
 test('initial page renders welcome note in preview', async ({ page }) => {
   await expect(page.locator('#editor')).toBeVisible();
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+});
+
+test('reload resets to welcome note even after saving custom text', async ({ page }) => {
+  const customText = 'Stored note across reload';
+  await page.fill('#editor', customText);
+  await page.waitForFunction(text => window.AppState.getText() === text, customText);
+  await page.waitForTimeout(400);
+  await page.waitForFunction(
+    text => window.localStorage.getItem('md:text') === text,
+    customText
+  );
+
+  await page.reload();
+
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
+});
+
+test('ignores stored text that only contains invisible characters', async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem('md:text', '\u200B\n\u200B');
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
+});
+
+test('clears stored text when reloading immediately after emptying editor', async ({ page }) => {
+  await page.fill('#editor', 'Personal draft');
+  await page.waitForFunction(() => window.AppState.getText() === 'Personal draft');
+  await page.waitForTimeout(400);
+
+  await page.fill('#editor', '');
+  await page.waitForFunction(() => window.AppState.getText() === '');
+
+  await page.reload();
+
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
+});
+
+test('clears stored settings on reload', async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem('md:settings', JSON.stringify({ lang: 'ja', extra: true }));
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#lang-switch')).toHaveValue('en');
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
+});
+
+test('clears stored language preference on reload', async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem('markdown-editor-language', 'ja');
+    window.localStorage.setItem('markdown-editor-language-source', 'user');
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#lang-switch')).toHaveValue('en');
+  await page.waitForFunction(
+    () =>
+      window.localStorage.getItem('markdown-editor-language') === null &&
+      window.localStorage.getItem('markdown-editor-language-source') === null
+  );
+  await page.waitForFunction(() => window.localStorage.getItem('md:settings') === null);
 });
 
 test('initial language defaults to English', async ({ page }) => {
