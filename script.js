@@ -461,7 +461,19 @@ function startApp() {
     document.documentElement.style.setProperty('--header-offset', offset + 'px');
   }
 
-  window.addEventListener('load', adjustTOCPosition);
+  function performInitialLayout() {
+    adjustTOCPosition();
+    const renderDuration = update();
+    extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
+    updateTOCHighlight();
+  }
+
+  if (document.readyState === 'complete') {
+    performInitialLayout();
+  } else {
+    window.addEventListener('load', performInitialLayout, { once: true });
+  }
+
   window.addEventListener('resize', adjustTOCPosition);
 
   function syncScroll(source, target) {
@@ -982,7 +994,6 @@ function startApp() {
   });
   editor.addEventListener('keyup', updateTOCHighlight);
   editor.addEventListener('click', updateTOCHighlight);
-  window.addEventListener('load', update);
 
   imageInput.addEventListener('change', event => {
     const file = event.target.files[0];
