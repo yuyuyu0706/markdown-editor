@@ -44,6 +44,25 @@ body {
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
+#lang-label {
+  font-weight: 500;
+  color: #003366;
+}
+
+#lang-switch {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #aac8ff;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #003366;
+  font-size: 0.9rem;
+}
+
+#lang-switch:focus-visible {
+  outline: 2px solid #002d6c;
+  outline-offset: 2px;
+}
+
 .toolbar-button:hover,
 .toolbar-button:focus-visible {
   background: #004488;
