@@ -99,6 +99,8 @@ test('table of contents navigation scrolls to selected section', async ({ page }
 
   await page.waitForFunction(label => {
     const previewEl = document.getElementById('preview');
+    const toolbar = document.getElementById('toolbar');
+    const headerOffset = toolbar ? toolbar.offsetHeight : 0;
     const slug = label
       .toLowerCase()
       .trim()
@@ -109,7 +111,7 @@ test('table of contents navigation scrolls to selected section', async ({ page }
       return false;
     }
     const diff = heading.getBoundingClientRect().top - previewEl.getBoundingClientRect().top;
-    return Math.abs(diff) < 5;
+    return Math.abs(diff - headerOffset) < 5;
   }, targetLabel);
 });
 
