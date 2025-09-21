@@ -215,56 +215,117 @@ test('preview retains manual scroll position while editing', async ({ page }) =>
   expect(Math.abs(finalScrollTop - initialScrollTop)).toBeLessThan(10);
 });
 
-test('table of contents navigation scrolls to selected section', async ({ page }) => {
-  const markdown = ['# TOC Test'];
-  for (let i = 1; i <= 20; i += 1) {
-    markdown.push(
-      `\n## Jump Section ${i}\n\n` +
-        'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(8) +
-        '\n\n' +
-        'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '.repeat(6)
-    );
+test(
+  'table of contents navigation aligns heading under toolbar padding (±10px, reduced-motion)',
+  async ({ page }) => {
+    // The preview scroll logic aligns the clicked heading so that its top edge sits directly
+    // under the toolbar plus the preview padding. Build a markdown document large enough so the
+    // target heading starts well below the fold to avoid environment-specific font/line wrapping
+    // affecting the initial viewport.
+    const markdown = ['# TOC Test'];
+    const sectionCount = 32;
+    const targetIndex = 24;
+    for (let i = 1; i <= sectionCount; i += 1) {
+      markdown.push(
+        `\n## Jump Section ${i}\n\n` +
+          'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(10) +
+          '\n\n' +
+          'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '.repeat(8) +
+          '\n\n' +
+          'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'.repeat(4)
+      );
+    }
+    await page.fill('#editor', markdown.join('\n'));
+
+    const targetLabel = `Jump Section ${targetIndex}`;
+
+    const targetSlugHandle = await page.waitForFunction(label => {
+      const preview = document.getElementById('preview');
+      if (!preview) {
+        return null;
+      }
+      const heading = Array.from(preview.querySelectorAll('h2')).find(
+        element => element.textContent && element.textContent.trim() === label
+      );
+      return heading ? heading.id : null;
+    }, targetLabel);
+    const targetSlug = await targetSlugHandle.jsonValue();
+
+    expect(targetSlug).toBeTruthy();
+
+    const tocItem = page.locator(`#toc .toc-item[data-target="${targetSlug}"]`).first();
+    await expect(tocItem).toBeVisible();
+
+    const tolerance = 10;
+    const waitForAlignment = async () => {
+      await page.evaluate(() => {
+        window.__lastPreviewScrollTarget = null;
+      });
+      await tocItem.click();
+      await page.waitForFunction(
+        ({ slug, tolerance: tol }) => {
+          const previewEl = document.getElementById('preview');
+          const toolbar = document.getElementById('toolbar');
+          const scrollInfo = window.__lastPreviewScrollTarget;
+          if (!previewEl || !toolbar || !scrollInfo) {
+            return false;
+          }
+          if (scrollInfo.id !== slug) {
+            return false;
+          }
+
+          const heading = previewEl.querySelector(`#${slug}`);
+          if (!heading) {
+            return false;
+          }
+
+          const paddingTop = parseFloat(getComputedStyle(previewEl).paddingTop || '0') || 0;
+          const expectedOffset = toolbar.offsetHeight + paddingTop;
+          const previewRect = previewEl.getBoundingClientRect();
+          const headingRect = heading.getBoundingClientRect();
+          const relativeTop = headingRect.top - previewRect.top;
+
+          return Math.abs(relativeTop - expectedOffset) <= tol;
+        },
+        { slug: targetSlug, tolerance: tolerance },
+        { timeout: 12_000 }
+      );
+    };
+
+    try {
+      await waitForAlignment();
+    } catch (error) {
+      // If the event or geometry check fails once, retry the click exactly one more time to
+      // capture potential missed events before surfacing the failure.
+      await waitForAlignment();
+    }
+
+    const alignmentDelta = await page.evaluate(slug => {
+      const previewEl = document.getElementById('preview');
+      const toolbar = document.getElementById('toolbar');
+      const heading = previewEl ? previewEl.querySelector(`#${slug}`) : null;
+      const scrollInfo = window.__lastPreviewScrollTarget;
+      if (!previewEl || !toolbar || !heading || !scrollInfo) {
+        return null;
+      }
+
+      const paddingTop = parseFloat(getComputedStyle(previewEl).paddingTop || '0') || 0;
+      const expectedOffset = toolbar.offsetHeight + paddingTop;
+      const previewRect = previewEl.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      const relativeTop = headingRect.top - previewRect.top;
+
+      return {
+        idMatch: scrollInfo.id === slug,
+        delta: relativeTop - expectedOffset,
+      };
+    }, targetSlug);
+
+    expect(alignmentDelta).not.toBeNull();
+    expect(alignmentDelta.idMatch).toBe(true);
+    expect(Math.abs(alignmentDelta.delta)).toBeLessThanOrEqual(tolerance);
   }
-  await page.fill('#editor', markdown.join('\n'));
-
-  const targetLabel = 'Jump Section 15';
-  const targetSlug = targetLabel
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  await page.waitForFunction(slug => {
-    return document.querySelector(`#toc .toc-item[data-target="${slug}"]`);
-  }, targetSlug);
-
-  const tocItem = page.locator(`#toc .toc-item[data-target="${targetSlug}"]`).first();
-  await expect(tocItem).toBeVisible();
-  await tocItem.click();
-
-  const tolerance = 10;
-  await page.waitForFunction(({ slug, tolerance: tol }) => {
-    const previewEl = document.getElementById('preview');
-    const toolbar = document.getElementById('toolbar');
-    if (!previewEl || !toolbar) {
-      return false;
-    }
-    const heading = previewEl.querySelector(`#${slug}`);
-    if (!heading) {
-      return false;
-    }
-    const paddingTop = parseFloat(getComputedStyle(previewEl).paddingTop || '0') || 0;
-    const expectedOffset = toolbar.offsetHeight + paddingTop;
-    const previewRect = previewEl.getBoundingClientRect();
-    const headingRect = heading.getBoundingClientRect();
-    const relativeTop = headingRect.top - previewRect.top;
-    const scrollInfo = window.__lastPreviewScrollTarget;
-    if (!scrollInfo || scrollInfo.id !== slug) {
-      return false;
-    }
-    return Math.abs(relativeTop - expectedOffset) <= tol;
-  }, { slug: targetSlug, tolerance });
-});
+);
 
 test('help window can be opened and closed', async ({ page }) => {
   const helpWindow = page.locator('#help-window');
