@@ -18,7 +18,9 @@
   };
 
   const TEXT_SAVE_DEBOUNCE = 300;
+  const INERT_TEXT_PATTERN = /[\s\u200B\u200C\u200D\uFEFF]+/g;
   let textSaveTimer = null;
+  let fallbackDocText = '';
 
   function isPlainObject(value) {
     return Object.prototype.toString.call(value) === '[object Object]';
@@ -49,9 +51,16 @@
     }
   }
 
+  function analyzeText(rawText) {
+    const normalized = normalizeText(rawText);
+    const stripped = normalized.replace(INERT_TEXT_PATTERN, '');
+    const hasMeaningful = stripped.length > 0;
+    return { normalized, hasMeaningful };
+  }
+
   function persistTextValue(text) {
-    const normalized = normalizeText(text);
-    if (!normalized.trim()) {
+    const { normalized, hasMeaningful } = analyzeText(text);
+    if (!hasMeaningful || (fallbackDocText && normalized === fallbackDocText)) {
       safeRemoveItem(STORAGE_KEYS.text);
       return;
     }
@@ -133,15 +142,19 @@
      */
     init(initial) {
       const initialText = initial && typeof initial.text === 'string' ? initial.text : '';
-      const storedText = safeGetItem(STORAGE_KEYS.text);
-      const hasStoredText =
-        typeof storedText === 'string' && storedText.trim().length > 0;
-      const nextText = hasStoredText ? storedText : initialText;
+      const { normalized: initialNormalized } = analyzeText(initialText);
+      fallbackDocText = initialNormalized;
 
-      state.docText = normalizeText(nextText);
+      const storedText = safeGetItem(STORAGE_KEYS.text);
+      const { normalized: storedNormalized, hasMeaningful: storedHasMeaning } =
+        analyzeText(storedText);
+      const useStoredText = storedHasMeaning && storedNormalized !== fallbackDocText;
+      const nextText = useStoredText ? storedNormalized : fallbackDocText;
+
+      state.docText = nextText;
       state.settings = mergeSettings(initial && initial.settings);
 
-      if (!hasStoredText && storedText !== null) {
+      if (!useStoredText && storedText !== null) {
         safeRemoveItem(STORAGE_KEYS.text);
       }
 

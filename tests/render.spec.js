@@ -21,6 +21,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('does not persist the welcome note on first load', async ({ page }) => {
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+});
+
 test('initial page renders welcome note in preview', async ({ page }) => {
   await expect(page.locator('#editor')).toBeVisible();
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
@@ -37,8 +42,19 @@ test('falls back to welcome note when stored text is empty', async ({ page }) =>
   await expect(page.locator('#editor')).toHaveValue(
     /Welcome to Markdown Editor Blue/
   );
-  const storedValue = await page.evaluate(() => window.localStorage.getItem('md:text'));
-  expect(storedValue).toBeNull();
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
+});
+
+test('ignores stored text that only contains invisible characters', async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem('md:text', '\u200B\n\u200B');
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
 });
 
 test('clears stored text when reloading immediately after emptying editor', async ({ page }) => {
@@ -53,8 +69,7 @@ test('clears stored text when reloading immediately after emptying editor', asyn
 
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
   await expect(page.locator('#editor')).toHaveValue(/Welcome to Markdown Editor Blue/);
-  const storedValue = await page.evaluate(() => window.localStorage.getItem('md:text'));
-  expect(storedValue).not.toBe('Personal draft');
+  await page.waitForFunction(() => window.localStorage.getItem('md:text') === null);
 });
 
 test('initial language defaults to English', async ({ page }) => {
