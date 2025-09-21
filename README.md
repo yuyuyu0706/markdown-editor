@@ -1,105 +1,81 @@
-# markdown-editor
-# Simple Markdown Editor with Image Folding (Base64)
+# Markdown Editor Blue
 
-このプロジェクトは、シンプルなMarkdownエディタです。次に機能を実現しています。
-- **ブラウザだけで完結**する
-- **画像をBase64で挿入し、編集の妨げにならないよう折りたたみ表示**する
+A browser-only Markdown editor focused on smooth writing and review workflows. It combines a distraction-free textarea, instant preview, diagram rendering, and convenient helpers so that you can prepare documentation without leaving your browser.
 
----
+## ✨ Features at a glance
+- **Live preview powered by [marked](https://github.com/markedjs/marked)** with synchronized scrolling between the editor and preview panes.
+- **Mermaid diagram support** – fenced code blocks labelled `mermaid` render as diagrams and stay responsive.
+- **Inline Base64 images with folded placeholders** – inserted images are stored in-memory and represented by a compact comment block in the editor while the preview expands them as `<img>` tags.
+- **Clickable task lists** – checking items in the preview updates the underlying Markdown.
+- **Automatic table of contents panel** that tracks editor focus, highlights the current heading, and lets you jump around the document.
+- **Drag-to-resize layout** for the table of contents, editor, and preview columns.
+- **Built-in templates** for common documents such as meeting notes, release notes, and READMEs.
+- **File operations without a backend** – open existing Markdown files, save edits locally, or print to PDF via the browser.
+- **Contextual help window** containing Markdown and Mermaid cheat sheets.
+- **Runtime language switcher** backed by the translations in `i18n/en.json` and `i18n/ja.json`.
 
-## 🔧 特徴
-
-- ✅ Markdownリアルタイムプレビュー（`marked.js`）
-- ✅ Mermaid記法のプレビュー描画（`mermaid.js`）
-- ✅ Base64形式で画像を挿入（ローカル画像選択）
-- ✅ 編集エリアでは画像を**折りたたみ表示**（ファイル名表示のみに）
-- ✅ プレビュー領域では画像を**展開して表示**
-- ✅ 編集したMarkdownをローカルファイルとして保存
-- ✅ HTML/CSS/JavaScript を分離した構造
-- ✅ ブラウザのみで動作、インストール不要
-
----
-
-## 📁 ファイル構成
-
-```plaintext
+## 📁 Project structure
+```text
 markdown-editor/
-├── index.html       # メインUI
-├── style.css        # 見た目のスタイル定義
-├── script.js        # 画像挿入や折りたたみ処理のJavaScript
-└── README.md        # 本ファイル
+├── index.html            # Application shell and toolbar
+├── style.css             # Layout and visual styling
+├── script.js             # Editor logic, preview rendering, and UI behaviors
+├── config.js             # Basic configuration (default language)
+├── i18n.js               # Lightweight internationalisation helper
+├── i18n/                 # Translation resources (English & Japanese)
+├── template/             # Markdown templates selectable from the toolbar
+├── images/               # Static assets (icons)
+├── tests/                # Playwright end-to-end tests
+└── package.json          # Test dependencies and scripts
 ```
 
----
+## 🚀 Getting started
+1. **Clone or download the repository.**
+   ```bash
+   git clone https://github.com/your-repo/markdown-editor.git
+   cd markdown-editor
+   ```
+2. **Open `index.html` in your browser.**
+   The application is completely static, so no build step is required.
 
-## 🚀 使用方法
+> 💡 If you plan to run the automated tests, install dependencies first: `npm install`.
 
-### 1. クローンまたはダウンロード
+## 🖊 Using the editor
+| Action | What happens |
+| --- | --- |
+| Type Markdown in the left pane | The right pane updates instantly with rendered HTML. |
+| Scroll either pane | The other side keeps pace so you stay in context. |
+| Click headings in the TOC | The preview scrolls to the heading and the editor selection follows. |
+| Insert Image | Pick a local image to embed as Base64; the editor receives a folded placeholder block. |
+| Toggle checkboxes in the preview | The matching task item in the Markdown source is toggled. |
+| Choose a template | Replace the current document with a starter outline from `template/`. |
+| Open / Save / Export PDF | Load Markdown from disk, download your work, or print the preview to PDF. |
+| Toggle the help window | Show or hide quick reference sheets for Markdown and Mermaid syntax. |
 
-```
-git clone https://github.com/your-repo/markdown-editor.git
-cd markdown-editor
-```
-
-または、ZIPダウンロードして展開してください。
-
----
-
-### 2. ブラウザで開く
-
-`index.html` をダブルクリックするか、ブラウザで開いてください。
-
----
-
-### 3. エディタ機能の使い方
-
-| 操作                         | 説明                                           |
-|------------------------------|------------------------------------------------|
-| Markdownを入力              | 左側のテキストエリアに記述                     |
-| プレビュー表示              | 右側にリアルタイムで反映                      |
-| 画像挿入ボタンをクリック    | ローカル画像を選択                            |
-| Base64挿入（自動）           | ファイル名と紐づいたBase64文字列をMarkdown形式で折りたたみ挿入 |
-
-例（エディタ上）：
-
+### Image placeholder example
 ```markdown
-<!-- image:cat.png -->
-[画像: cat.png]
+<!-- image:diagram.png -->
+[Image: diagram.png]
 <!-- /image -->
 ```
+The preview resolves this block to the Base64 image you inserted, keeping the editor uncluttered.
 
-プレビュー側では画像が展開されます。
-
----
-
-### 4. Mermaid記法の例
-
-Mermaidのフローチャートなどを描画するには、コードブロックの言語に `mermaid` を指定します。
-日本語など長いテキストは半角22文字（全角11文字）ごとに自動で改行され、図形の幅に合わせて表示されます。
-
+### Mermaid diagrams
+Create a fenced code block labelled `mermaid` to render diagrams:
 ```mermaid
 flowchart LR
-  A --> B
+  Idea --> Draft --> Review --> Publish
 ```
 
----
+## 🌐 Localization
+The toolbar language selector updates the interface instantly. To add or adjust translations, edit the JSON files under `i18n/` and include matching keys for each language.
 
-## 📦 ライブラリ
+## 🧪 Development & testing
+Playwright tests are provided to guard against regressions.
+```bash
+npm install       # first-time setup
+npm test          # run end-to-end tests
+```
 
-- [marked.js](https://github.com/markedjs/marked)：MarkdownをHTMLに変換
-- [mermaid](https://mermaid.js.org/)：Mermaid記法をSVGに変換
-
----
-
-## 🧩 今後の拡張候補
-
-- 画像の削除や再選択
-- ダークモード対応
-- Markdownの読み込み（ローカルストレージ対応）
-- エクスポート（HTML / PDF）
-
----
-
-## 📄 ライセンス
-
-MITライセンス
+## 📄 License
+MIT License. See [LICENSE](./LICENSE) for details.
