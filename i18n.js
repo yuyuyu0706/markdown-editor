@@ -188,12 +188,17 @@
       return storedLang;
     }
 
+    const defaultLang = getDefaultLanguage();
+    if (defaultLang) {
+      return defaultLang;
+    }
+
     const browserLang = getBrowserLanguage();
     if (browserLang) {
       return browserLang;
     }
 
-    return getDefaultLanguage();
+    return 'en';
   }
 
   async function setLang(lang) {
