@@ -219,6 +219,13 @@ code {
   color: #003366;
 }
 
+pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
 #help-window {
   position: fixed;
   bottom: 1rem;
