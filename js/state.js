@@ -41,16 +41,33 @@
     }
   }
 
+  function safeRemoveItem(key) {
+    try {
+      global.localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('[AppState] Unable to remove from localStorage.', error);
+    }
+  }
+
+  function persistTextValue(text) {
+    const normalized = normalizeText(text);
+    if (!normalized.trim()) {
+      safeRemoveItem(STORAGE_KEYS.text);
+      return;
+    }
+    safeSetItem(STORAGE_KEYS.text, normalized);
+  }
+
   function scheduleTextPersist(text) {
     if (typeof global.setTimeout !== 'function') {
-      safeSetItem(STORAGE_KEYS.text, text);
+      persistTextValue(text);
       return;
     }
     if (textSaveTimer) {
       global.clearTimeout(textSaveTimer);
     }
     textSaveTimer = global.setTimeout(() => {
-      safeSetItem(STORAGE_KEYS.text, text);
+      persistTextValue(text);
       textSaveTimer = null;
     }, TEXT_SAVE_DEBOUNCE);
   }
@@ -100,10 +117,16 @@
     init(initial) {
       const initialText = initial && typeof initial.text === 'string' ? initial.text : '';
       const storedText = safeGetItem(STORAGE_KEYS.text);
-      const nextText = storedText !== null ? storedText : initialText;
+      const hasStoredText =
+        typeof storedText === 'string' && storedText.trim().length > 0;
+      const nextText = hasStoredText ? storedText : initialText;
 
       state.docText = normalizeText(nextText);
       state.settings = mergeSettings(initial && initial.settings);
+
+      if (!hasStoredText && storedText !== null) {
+        safeRemoveItem(STORAGE_KEYS.text);
+      }
 
       scheduleTextPersist(state.docText);
       Bus.emit('text:changed', { text: state.docText, source: 'init' });

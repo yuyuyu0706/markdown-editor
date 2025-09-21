@@ -26,6 +26,21 @@ test('initial page renders welcome note in preview', async ({ page }) => {
   await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
 });
 
+test('falls back to welcome note when stored text is empty', async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem('md:text', '');
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#preview')).toContainText('Welcome to Markdown Editor Blue');
+  await expect(page.locator('#editor')).toHaveValue(
+    /Welcome to Markdown Editor Blue/
+  );
+  const storedValue = await page.evaluate(() => window.localStorage.getItem('md:text'));
+  expect(storedValue).toBeNull();
+});
+
 test('initial language defaults to English', async ({ page }) => {
   await expect(page.locator('#lang-switch')).toHaveValue('en');
   await expect(page.locator('#open-md')).toHaveText('📂 Open');
