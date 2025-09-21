@@ -101,8 +101,6 @@ test('table of contents navigation scrolls to selected section', async ({ page }
     const previewEl = document.getElementById('preview');
     const toolbar = document.getElementById('toolbar');
     const headerOffset = toolbar ? toolbar.offsetHeight : 0;
-    const previewStyle = window.getComputedStyle(previewEl);
-    const paddingTop = parseFloat(previewStyle.paddingTop) || 0;
     const slug = label
       .toLowerCase()
       .trim()
@@ -113,7 +111,7 @@ test('table of contents navigation scrolls to selected section', async ({ page }
       return false;
     }
     const diff = heading.getBoundingClientRect().top - previewEl.getBoundingClientRect().top;
-    return Math.abs(diff - (headerOffset + paddingTop)) < 5;
+    return Math.abs(diff - headerOffset) < 3;
   }, targetLabel);
 });
 
