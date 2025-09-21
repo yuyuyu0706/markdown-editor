@@ -47,7 +47,9 @@ function startApp() {
   if (langSwitch) {
     langSwitch.value = i18n.getCurrentLang();
     langSwitch.addEventListener('change', event => {
-      i18n.setLang(event.target.value);
+      const nextLang = event.target.value;
+      i18n.setLang(nextLang);
+      AppState.setSetting('lang', nextLang);
     });
   }
 
@@ -88,7 +90,7 @@ function startApp() {
           }
         }
 
-        update();
+        AppState.setText(result, 'editor');
         adjustTOCPosition();
         updateTOCHighlight();
 
@@ -197,7 +199,7 @@ function startApp() {
           }
         }
 
-        update();
+        AppState.setText(text, 'editor');
         adjustTOCPosition();
         updateTOCHighlight();
 
@@ -317,6 +319,7 @@ function startApp() {
   }
 
   document.addEventListener('i18n:change', () => {
+    AppState.setSetting('lang', i18n.getCurrentLang());
     updateDocumentTitle();
     if (langSwitch) {
       langSwitch.value = i18n.getCurrentLang();
@@ -588,7 +591,7 @@ function startApp() {
 
   function update() {
     const renderStart = performance.now();
-    const raw = editor.value;
+    const raw = AppState.getText();
     const previousScrollTop = preview.scrollTop;
 
     // Expand <!-- image:filename --> ... <!-- /image --> placeholders
@@ -639,6 +642,35 @@ function startApp() {
     requestAnimationFrame(() => requestAnimationFrame(restore));
 
     return renderDuration;
+  }
+
+  function handleTextStateChange(event) {
+    if (!event || typeof event.text !== 'string') {
+      return;
+    }
+
+    const { text, source } = event;
+    const prevSelectionStart = editor.selectionStart;
+    const prevSelectionEnd = editor.selectionEnd;
+    const prevScrollTop = editor.scrollTop;
+
+    if (source !== 'editor' && editor.value !== text) {
+      editor.value = text;
+      if (source === 'init') {
+        editor.selectionStart = editor.selectionEnd = 0;
+        editor.scrollTop = 0;
+      } else {
+        editor.selectionStart = prevSelectionStart;
+        editor.selectionEnd = prevSelectionEnd;
+        editor.scrollTop = prevScrollTop;
+      }
+    }
+
+    const renderDuration = update();
+    extendEditorScrollSuppression(
+      renderDuration + INPUT_SCROLL_SUPPRESS_DURATION
+    );
+    updateTOCHighlight();
   }
 
   function updatePreviewTaskCheckboxes(raw) {
@@ -703,7 +735,7 @@ function startApp() {
     }
 
     const newChar = target.checked ? 'x' : ' ';
-    const currentValue = editor.value;
+    const currentValue = AppState.getText();
 
     if (currentValue.charAt(mapping.index).toLowerCase() === newChar) {
       return;
@@ -723,13 +755,11 @@ function startApp() {
     editor.selectionEnd = prevSelectionEnd;
 
     extendEditorScrollSuppression();
-    const renderDuration = update();
-    extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
-    updateTOCHighlight();
+    AppState.setText(editor.value, 'editor');
   }
 
   function buildTOC() {
-    const raw = editor.value;
+    const raw = AppState.getText();
     const slugCounts = {};
     headingPositions = [];
 
@@ -880,9 +910,7 @@ function startApp() {
 
   editor.addEventListener('input', () => {
     extendEditorScrollSuppression();
-    const renderDuration = update();
-    extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
-    updateTOCHighlight();
+    AppState.setText(editor.value, 'editor');
   });
 
   editor.addEventListener('compositionstart', extendEditorScrollSuppression);
@@ -1028,9 +1056,7 @@ function startApp() {
     editor.scrollTop = prevScrollTop;
     editor.selectionStart = editor.selectionEnd = newCursorPos;
 
-    const renderDuration = update();
-    extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
-    updateTOCHighlight();
+    AppState.setText(editor.value, 'editor');
 
     return true;
   }
@@ -1068,10 +1094,14 @@ function startApp() {
 
       const markdownImage = i18n.t('image.markdownTemplate', { filename });
       const cursorPos = editor.selectionStart;
-      editor.value =
-        editor.value.slice(0, cursorPos) + markdownImage + editor.value.slice(cursorPos);
+      const currentValue = AppState.getText();
+      const newValue =
+        currentValue.slice(0, cursorPos) +
+        markdownImage +
+        currentValue.slice(cursorPos);
+      editor.value = newValue;
 
-      update();
+      AppState.setText(newValue, 'editor');
     };
     reader.readAsDataURL(file);
   });
@@ -1104,7 +1134,7 @@ function startApp() {
         : 'document.md';
     const filename = trimmedName.endsWith('.md') ? trimmedName : `${trimmedName}.md`;
 
-    const blob = new Blob([editor.value], { type: 'text/markdown' });
+    const blob = new Blob([AppState.getText()], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1119,6 +1149,22 @@ function startApp() {
 
   helpClose.addEventListener('click', () => {
     helpWindow.classList.add('hidden');
+  });
+
+  Bus.on('text:changed', handleTextStateChange);
+
+  Bus.on('settings:changed', event => {
+    if (!event || event.key !== 'lang') {
+      return;
+    }
+    if (langSwitch && typeof event.value === 'string') {
+      langSwitch.value = event.value;
+    }
+  });
+
+  AppState.init({
+    text: editor.value,
+    settings: { lang: i18n.getCurrentLang() }
   });
 
 }
