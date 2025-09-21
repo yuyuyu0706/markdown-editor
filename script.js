@@ -68,15 +68,6 @@ function startApp() {
         return;
       }
 
-      const shouldReplace =
-        !editor.value.trim() ||
-        confirm(i18n.t('dialogs.replaceFile'));
-
-      if (!shouldReplace) {
-        markdownInput.value = '';
-        return;
-      }
-
       const reader = new FileReader();
 
       reader.onload = loadEvent => {
@@ -1036,19 +1027,20 @@ function startApp() {
   });
 
   saveMdBtn.addEventListener('click', () => {
-    const filename = prompt(
-      i18n.t('dialogs.saveFilenamePrompt'),
-      i18n.t('dialogs.defaultFileName')
-    );
-    if (filename) {
-      const blob = new Blob([editor.value], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename.endsWith('.md') ? filename : `${filename}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    const defaultName = i18n.t('dialogs.defaultFileName');
+    const trimmedName =
+      typeof defaultName === 'string' && defaultName.trim()
+        ? defaultName.trim()
+        : 'document.md';
+    const filename = trimmedName.endsWith('.md') ? trimmedName : `${trimmedName}.md`;
+
+    const blob = new Blob([editor.value], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   });
 
   helpBtn.addEventListener('click', () => {
