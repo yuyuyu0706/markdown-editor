@@ -113,17 +113,13 @@ test('table of contents navigation scrolls to selected section', async ({ page }
   await expect(tocItem).toBeVisible();
   await tocItem.click();
 
-  await page.waitForFunction((label, tolerance) => {
+  const tolerance = 10;
+  await page.waitForFunction(({ slug, tolerance: tol }) => {
     const previewEl = document.getElementById('preview');
     const toolbar = document.getElementById('toolbar');
     if (!previewEl || !toolbar) {
       return false;
     }
-    const slug = label
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w]+/g, '-')
-      .replace(/^-+|-+$/g, '');
     const heading = previewEl.querySelector(`#${slug}`);
     if (!heading) {
       return false;
@@ -137,8 +133,8 @@ test('table of contents navigation scrolls to selected section', async ({ page }
     if (!scrollInfo || scrollInfo.id !== slug) {
       return false;
     }
-    return Math.abs(relativeTop - expectedOffset) <= tolerance;
-  }, targetLabel, 10);
+    return Math.abs(relativeTop - expectedOffset) <= tol;
+  }, { slug: targetSlug, tolerance });
 });
 
 test('help window can be opened and closed', async ({ page }) => {
