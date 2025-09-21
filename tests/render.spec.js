@@ -192,6 +192,213 @@ test('language switch cycles English → Japanese → English', async ({ page })
   await expect(helpButton).toHaveText('❔ Help');
 });
 
+test('preview checkbox interactions only update their markdown lines', async ({ page }) => {
+  const editor = page.locator('#editor');
+
+  const initialMarkdown = [
+    '# Checkbox Sync Test',
+    '',
+    '- [ ] single unchecked',
+    '',
+    '## Multiple',
+    '- [ ] multi alpha',
+    '- [x] multi beta',
+    '- [ ] multi gamma',
+    '',
+    '## Nested',
+    '- [ ] parent task',
+    '  - [ ] nested child',
+    '  - [x] nested done',
+    '- [ ] trailing outer',
+    '',
+    '## Japanese',
+    '- [ ] 日本語のタスクA',
+    '- [x] 日本語のタスクB',
+  ].join('\n');
+
+  const initialLines = initialMarkdown.split('\n');
+  let currentLines = initialLines.slice();
+
+  const previewCheckboxSelector = '#preview input[type="checkbox"]';
+  const byTaskIndex = index =>
+    page.locator(`${previewCheckboxSelector}[data-task-index="${index}"]`);
+
+  const getEditorLines = async () => (await editor.inputValue()).split('\n');
+
+  const applyCheckboxState = (line, checked) => line.replace(/\[( |x|X)\]/, checked ? '[x]' : '[ ]');
+
+  const defaultCaretColumnForLine = line => {
+    const closingBracketIndex = line.indexOf(']');
+    if (closingBracketIndex === -1) {
+      return Math.min(line.length, 2);
+    }
+    return closingBracketIndex + 1;
+  };
+
+  const setCaretToLineColumn = async (lineIndex, columnOverride) => {
+    const snapshot = currentLines.slice();
+    const line = snapshot[lineIndex];
+    const safeColumn = Math.min(Math.max(columnOverride, 0), line.length);
+    await page.evaluate(({ lines, targetLineIndex, column }) => {
+      const editorEl = document.getElementById('editor');
+      if (!editorEl) {
+        return;
+      }
+      let offset = 0;
+      for (let i = 0; i < targetLineIndex; i += 1) {
+        offset += lines[i].length + 1;
+      }
+      const target = offset + column;
+      try {
+        editorEl.focus({ preventScroll: true });
+      } catch (error) {
+        editorEl.focus();
+      }
+      editorEl.selectionStart = target;
+      editorEl.selectionEnd = target;
+    }, { lines: snapshot, targetLineIndex: lineIndex, column: safeColumn });
+  };
+
+  const getSelectionRange = async () =>
+    page.evaluate(() => {
+      const editorEl = document.getElementById('editor');
+      if (!editorEl) {
+        return null;
+      }
+      return {
+        start: editorEl.selectionStart,
+        end: editorEl.selectionEnd,
+      };
+    });
+
+  const assertOnlyLineChanged = (beforeLines, afterLines, targetIndex, expectedLine) => {
+    expect(afterLines.length).toBe(beforeLines.length);
+    afterLines.forEach((line, idx) => {
+      if (idx === targetIndex) {
+        expect(line).toBe(expectedLine);
+      } else {
+        expect(line).toBe(beforeLines[idx]);
+      }
+    });
+  };
+
+  const selectionTolerance = 4;
+
+  const toggleAndAssert = async ({ checkboxLocator, lineIndex, expectedLine, expectedChecked }) => {
+    const caretColumn = defaultCaretColumnForLine(currentLines[lineIndex]);
+    await setCaretToLineColumn(lineIndex, caretColumn);
+    const beforeSelection = await getSelectionRange();
+    expect(beforeSelection).not.toBeNull();
+
+    const beforeEditorLines = await getEditorLines();
+    expect(beforeEditorLines).toEqual(currentLines);
+
+    const previousLines = currentLines.slice();
+
+    await checkboxLocator.click();
+
+    const expectedLines = previousLines.slice();
+    expectedLines[lineIndex] = expectedLine;
+    const expectedText = expectedLines.join('\n');
+
+    await page.waitForFunction(
+      expected => window.AppState && window.AppState.getText() === expected,
+      expectedText
+    );
+
+    await expect(checkboxLocator).toHaveJSProperty('checked', expectedChecked);
+
+    const afterEditorLines = await getEditorLines();
+    assertOnlyLineChanged(previousLines, afterEditorLines, lineIndex, expectedLine);
+
+    const afterSelection = await getSelectionRange();
+    expect(afterSelection).not.toBeNull();
+    expect(Math.abs(afterSelection.start - beforeSelection.start)).toBeLessThanOrEqual(
+      selectionTolerance
+    );
+    expect(Math.abs(afterSelection.end - beforeSelection.end)).toBeLessThanOrEqual(
+      selectionTolerance
+    );
+
+    currentLines = afterEditorLines;
+  };
+
+  const runRoundTrip = async ({ checkboxLocator, lineIndex }) => {
+    const baseLine = currentLines[lineIndex];
+    const checkedLine = applyCheckboxState(baseLine, true);
+    const uncheckedLine = applyCheckboxState(baseLine, false);
+    const initiallyChecked = /\[(x|X)\]/.test(baseLine);
+
+    if (initiallyChecked) {
+      await toggleAndAssert({
+        checkboxLocator,
+        lineIndex,
+        expectedLine: uncheckedLine,
+        expectedChecked: false,
+      });
+      await toggleAndAssert({
+        checkboxLocator,
+        lineIndex,
+        expectedLine: checkedLine,
+        expectedChecked: true,
+      });
+    } else {
+      await toggleAndAssert({
+        checkboxLocator,
+        lineIndex,
+        expectedLine: checkedLine,
+        expectedChecked: true,
+      });
+      await toggleAndAssert({
+        checkboxLocator,
+        lineIndex,
+        expectedLine: uncheckedLine,
+        expectedChecked: false,
+      });
+    }
+  };
+
+  await test.step('initialize markdown with checklist scenarios', async () => {
+    await editor.fill(initialMarkdown);
+    await page.waitForFunction(
+      expected => window.AppState && window.AppState.getText() === expected,
+      initialMarkdown
+    );
+
+    await expect(editor).toHaveValue(initialMarkdown);
+    await expect(page.locator(`${previewCheckboxSelector}[data-task-index]`)).toHaveCount(10);
+
+    const lines = await getEditorLines();
+    expect(lines).toEqual(currentLines);
+  });
+
+  await test.step('single checkbox toggles only its markdown line', async () => {
+    await runRoundTrip({ checkboxLocator: byTaskIndex(0), lineIndex: 2 });
+  });
+
+  await test.step('multiple checkboxes toggle independently within the same list', async () => {
+    await runRoundTrip({ checkboxLocator: byTaskIndex(1), lineIndex: 5 });
+    await runRoundTrip({ checkboxLocator: byTaskIndex(2), lineIndex: 6 });
+  });
+
+  await test.step('nested checklist items toggle without affecting siblings', async () => {
+    await runRoundTrip({ checkboxLocator: byTaskIndex(5), lineIndex: 11 });
+  });
+
+  await test.step('checkbox with Japanese label toggles correctly', async () => {
+    const japaneseCheckbox = page
+      .locator('#preview li', { hasText: '日本語のタスクA' })
+      .locator('input[type="checkbox"]');
+    await runRoundTrip({ checkboxLocator: japaneseCheckbox, lineIndex: 16 });
+  });
+
+  await test.step('final editor content matches the initial markdown', async () => {
+    const finalLines = await getEditorLines();
+    expect(finalLines).toEqual(initialLines);
+    expect(currentLines).toEqual(initialLines);
+  });
+});
+
 test('preview retains manual scroll position while editing', async ({ page }) => {
   const longMarkdown = ['# Scroll Test'];
   for (let i = 1; i <= 40; i += 1) {
