@@ -34,7 +34,7 @@ test('inserts image into preview', async ({ page }) => {
     mimeType: 'image/png',
     buffer,
   });
-  await expect(page.locator('#editor')).toHaveValue(/\[画像: test.png\]/);
+  await expect(page.locator('#editor')).toHaveValue(/\[Image: test.png\]/);
   await expect(page.locator('#preview img')).toHaveAttribute('src', /data:image\/png;base64/);
 });
 

@@ -1,0 +1,50 @@
+{
+  "app": {
+    "title": "Markdown Editor Blue"
+  },
+  "toolbar": {
+    "open": "📂 開く",
+    "save": "💾 保存",
+    "exportPdf": "📄 PDF出力",
+    "insertImage": "🖼 画像を挿入",
+    "template": "📋 テンプレート",
+    "help": "❔ ヘルプ",
+    "languageLabel": "言語"
+  },
+  "language": {
+    "english": "English",
+    "japanese": "日本語"
+  },
+  "templates": {
+    "meetingNotes": "議事録",
+    "systemChangeOverview": "システム変更概要",
+    "systemChangeChecklist": "システム変更チェックリスト",
+    "readme": "Readme",
+    "releaseNotes": "リリースノート"
+  },
+  "dialogs": {
+    "replaceFile": "現在の内容を開くファイルの内容で置き換えます。よろしいですか？",
+    "fileReadErrorLog": "Markdownファイルの読み込みに失敗しました",
+    "fileReadErrorAlert": "Markdownファイルの読み込みに失敗しました。ファイルを確認してください。",
+    "replaceTemplate": "現在の内容をテンプレートで置き換えます。よろしいですか？",
+    "templateLoadErrorLog": "テンプレートの読み込みに失敗しました",
+    "templateLoadErrorAlert": "テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。",
+    "saveFilenamePrompt": "保存するファイル名を入力してください",
+    "defaultFileName": "document.md",
+    "previewTitle": "プレビュー"
+  },
+  "editor": {
+    "placeholder": "ここにMarkdownを入力..."
+  },
+  "help": {
+    "close": "閉じる",
+    "markdownTitle": "Markdown チートシート",
+    "markdownCheatsheet": "# 見出し1\n## 見出し2\n\n- リスト\n1. 番号付きリスト\n\n**太字** *斜体*\n> 引用\n`コード`\n\n```\nコードブロック\n```\n\n[リンク](URL)",
+    "mermaidTitle": "Mermaid チートシート",
+    "mermaidCheatsheet": "```mermaid\ngraph TD\n  A[開始] --> B{条件}\n  B -->|はい| C[処理1]\n  B -->|いいえ| D[処理2]\n```"
+  },
+  "image": {
+    "fallback": "[画像: {filename}]",
+    "markdownTemplate": "\n<!-- image:{filename} -->\n[画像: {filename}]\n<!-- /image -->\n"
+  }
+}

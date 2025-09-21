@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Markdown Editor Blue</title>
@@ -8,12 +8,19 @@
 </head>
 <body>
   <header id="toolbar">
-    <h1 id="app-title">Markdown Editor Blue</h1>
+    <h1 id="app-title" data-i18n="app.title">Markdown Editor Blue</h1>
     <div id="toolbar-actions">
-      <button id="open-md" class="toolbar-button" type="button">📂 開く</button>
-      <button id="save-md" class="toolbar-button" type="button">💾 保存</button>
-      <button id="export-pdf" class="toolbar-button" type="button">📄 PDF出力</button>
-      <button id="insert-image" class="toolbar-button" type="button">🖼 画像を挿入</button>
+      <button id="open-md" class="toolbar-button" type="button" data-i18n="toolbar.open">📂 Open</button>
+      <button id="save-md" class="toolbar-button" type="button" data-i18n="toolbar.save">💾 Save</button>
+      <button id="export-pdf" class="toolbar-button" type="button" data-i18n="toolbar.exportPdf">📄 Export PDF</button>
+      <button
+        id="insert-image"
+        class="toolbar-button"
+        type="button"
+        data-i18n="toolbar.insertImage"
+      >
+        🖼 Insert Image
+      </button>
       <div id="template-menu">
         <button
           id="template-btn"
@@ -22,12 +29,20 @@
           aria-haspopup="true"
           aria-expanded="false"
           aria-controls="template-options"
+          data-i18n="toolbar.template"
         >
-          📋 テンプレート
+          📋 Templates
         </button>
         <div id="template-options" role="menu" aria-labelledby="template-btn" hidden></div>
       </div>
-      <button id="help-btn" class="toolbar-button" type="button">❔ ヘルプ</button>
+      <button id="help-btn" class="toolbar-button" type="button" data-i18n="toolbar.help">
+        ❔ Help
+      </button>
+      <label for="lang-switch" id="lang-label" data-i18n="toolbar.languageLabel">Language</label>
+      <select id="lang-switch">
+        <option value="en" data-i18n="language.english">English</option>
+        <option value="ja" data-i18n="language.japanese">日本語</option>
+      </select>
     </div>
     <input type="file" id="imageInput" accept="image/*" hidden>
     <input
@@ -41,47 +56,55 @@
   <main>
     <div id="toc"></div>
     <div id="toc-divider"></div>
-    <textarea id="editor" placeholder="ここにMarkdownを入力..."># Markdownエディタ
+    <textarea
+      id="editor"
+      placeholder="Type Markdown here..."
+      data-i18n-placeholder="editor.placeholder"
+    ># Welcome to Markdown Editor Blue
 
-画像を挿入すると折りたたみ表示になります。
-</textarea>
+Capture ideas, polish documentation, and share updates with instant preview support.
+
+Happy writing
+    </textarea>
     <div id="divider"></div>
     <div id="preview"></div>
   </main>
 
   <div id="help-window" class="hidden">
-    <button id="help-close">✖</button>
-    <h3>Markdown チートシート</h3>
-    <pre>
-# 見出し1
-## 見出し2
+    <button id="help-close" data-i18n-aria-label="help.close">✖</button>
+    <h3 data-i18n="help.markdownTitle">Markdown Cheat Sheet</h3>
+    <pre data-i18n="help.markdownCheatsheet">
+# Heading 1
+## Heading 2
 
-- リスト
-1. 番号付きリスト
+- List
+1. Numbered list
 
-**太字** *斜体*
-> 引用
-`コード`
+**Bold** *Italic*
+> Quote
+`Code`
 
 ```
-コードブロック
+Code block
 ```
 
-[リンク](URL)
+[Link](URL)
     </pre>
-    <h3>Mermaid チートシート</h3>
-    <pre>
+    <h3 data-i18n="help.mermaidTitle">Mermaid Cheat Sheet</h3>
+    <pre data-i18n="help.mermaidCheatsheet">
 ```mermaid
 graph TD
-  A[開始] --> B{条件}
-  B -->|はい| C[処理1]
-  B -->|いいえ| D[処理2]
+  A[Start] --> B{Condition}
+  B -->|Yes| C[Process 1]
+  B -->|No| D[Process 2]
 ```
     </pre>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script src="config.js"></script>
+  <script src="i18n.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
