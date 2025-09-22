@@ -10,22 +10,57 @@ const STORAGE_IGNORE_KEYS = [
   'markdown-editor-language-source',
 ];
 
+const MIN_EDITOR_WIDTH = 100;
+
 async function getPaneMetrics(page) {
   return await page.evaluate(() => {
+    const main = document.querySelector('main');
     const editor = document.getElementById('editor');
     const preview = document.getElementById('preview');
-    if (!editor || !preview) {
-      throw new Error('Editor or preview pane not found');
+    const toc = document.getElementById('toc');
+    const tocDivider = document.getElementById('toc-divider');
+    const divider = document.getElementById('divider');
+    if (!main || !editor || !preview || !divider) {
+      throw new Error('Editor layout elements not found');
     }
     const editorWidth = editor.offsetWidth;
     const previewWidth = preview.offsetWidth;
     const totalWidth = editorWidth + previewWidth;
+    const rect = main.getBoundingClientRect();
+    const tocWidth = toc ? toc.offsetWidth : 0;
+    const tocDividerWidth = tocDivider ? tocDivider.offsetWidth : 0;
+    const dividerWidth = divider.offsetWidth;
+    const availableWidth =
+      rect.width - tocWidth - tocDividerWidth - dividerWidth;
     return {
       editorWidth,
       previewWidth,
-      ratio: totalWidth > 0 ? editorWidth / totalWidth : 0,
+      totalWidth,
+      availableWidth,
+      ratio:
+        availableWidth > 0 ? editorWidth / availableWidth : 0,
     };
   });
+}
+
+function calculateExpectedEditorWidth(availableWidth, storedRatio) {
+  if (!Number.isFinite(availableWidth) || availableWidth <= 0) {
+    return null;
+  }
+  if (!Number.isFinite(storedRatio)) {
+    return null;
+  }
+  const minWidth = MIN_EDITOR_WIDTH;
+  const maxWidth = Math.max(minWidth, availableWidth - minWidth);
+  const minRatio = minWidth / availableWidth;
+  const maxRatio = maxWidth / availableWidth;
+  const safeRatio = Math.min(Math.max(storedRatio, minRatio), maxRatio);
+  const desiredWidth = Math.round(safeRatio * availableWidth);
+  const clampedWidth = Math.min(
+    Math.max(desiredWidth, minWidth),
+    maxWidth
+  );
+  return clampedWidth;
 }
 
 async function dragDivider(page, deltaX) {
@@ -199,15 +234,15 @@ test('divider persists width ratio after reload', async ({ page }) => {
   await waitForPaneLayout(page);
 
   const reloadedMetrics = await getPaneMetrics(page);
-  const reloadedTotalWidth =
-    reloadedMetrics.editorWidth + reloadedMetrics.previewWidth;
-  const expectedReloadedWidth = Math.round(
-    storedRatioAfterExpand * reloadedTotalWidth
+  const expectedReloadedWidth = calculateExpectedEditorWidth(
+    reloadedMetrics.availableWidth,
+    storedRatioAfterExpand
   );
+  expect(expectedReloadedWidth).not.toBeNull();
   expect(
     Math.abs(reloadedMetrics.editorWidth - expectedReloadedWidth)
   ).toBeLessThanOrEqual(2);
-  expect(Math.abs(reloadedMetrics.ratio - widenedMetrics.ratio)).toBeLessThanOrEqual(0.01);
+  expect(Math.abs(reloadedMetrics.ratio - storedRatioAfterExpand)).toBeLessThanOrEqual(0.01);
 
   const storageAfterReload = await getStorageSnapshot(page);
   expect(storageAfterReload[ratioKey]).toBe(ratioValue);
@@ -236,12 +271,13 @@ test('divider persists width ratio after reload', async ({ page }) => {
   await waitForPaneLayout(page);
 
   const finalMetrics = await getPaneMetrics(page);
-  const finalTotalWidth = finalMetrics.editorWidth + finalMetrics.previewWidth;
-  const expectedFinalWidth = Math.round(
-    storedRatioAfterContract * finalTotalWidth
+  const expectedFinalWidth = calculateExpectedEditorWidth(
+    finalMetrics.availableWidth,
+    storedRatioAfterContract
   );
+  expect(expectedFinalWidth).not.toBeNull();
   expect(Math.abs(finalMetrics.editorWidth - expectedFinalWidth)).toBeLessThanOrEqual(2);
-  expect(Math.abs(finalMetrics.ratio - narrowedMetrics.ratio)).toBeLessThanOrEqual(0.01);
+  expect(Math.abs(finalMetrics.ratio - storedRatioAfterContract)).toBeLessThanOrEqual(0.01);
 
   const finalStorage = await getStorageSnapshot(page);
   expect(finalStorage[ratioKey]).toBe(secondPersist.value);
