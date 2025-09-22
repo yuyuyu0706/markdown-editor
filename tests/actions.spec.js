@@ -42,6 +42,19 @@ async function dragDivider(page, deltaX) {
   await page.mouse.up();
 }
 
+async function waitForEditorWidth(page, targetWidth, tolerance = 2) {
+  await page.waitForFunction(
+    ({ targetWidth, tolerance }) => {
+      const editor = document.getElementById('editor');
+      if (!editor) {
+        return false;
+      }
+      return Math.abs(editor.offsetWidth - targetWidth) <= tolerance;
+    },
+    { targetWidth, tolerance }
+  );
+}
+
 async function getStorageSnapshot(page) {
   return await page.evaluate(() => {
     const snapshot = {};
@@ -144,7 +157,9 @@ test('divider can move horizontally', async ({ page }) => {
 
 test('divider persists width ratio after reload', async ({ page }) => {
   await page.setViewportSize(VIEWPORT);
-  await page.addInitScript(() => {
+  await page.goto(fileUrl);
+  await page.waitForLoadState('load');
+  await page.evaluate(() => {
     try {
       window.localStorage && window.localStorage.clear();
       window.sessionStorage && window.sessionStorage.clear();
@@ -152,9 +167,7 @@ test('divider persists width ratio after reload', async ({ page }) => {
       // Ignore storage access errors in non-standard environments.
     }
   });
-
-  await page.goto(fileUrl);
-  await page.waitForLoadState('load');
+  await page.reload({ waitUntil: 'load' });
   await page.waitForSelector('#divider');
 
   const initialMetrics = await getPaneMetrics(page);
@@ -182,16 +195,7 @@ test('divider persists width ratio after reload', async ({ page }) => {
   expect(ratioValue).not.toBeNull();
 
   await page.reload({ waitUntil: 'load' });
-  await page.waitForFunction(
-    (targetWidth, tolerance) => {
-      const editor = document.getElementById('editor');
-      return (
-        !!editor && Math.abs(editor.offsetWidth - targetWidth) <= tolerance
-      );
-    },
-    widenedMetrics.editorWidth,
-    2
-  );
+  await waitForEditorWidth(page, widenedMetrics.editorWidth, 2);
 
   const reloadedMetrics = await getPaneMetrics(page);
   expect(Math.abs(reloadedMetrics.editorWidth - widenedMetrics.editorWidth)).toBeLessThanOrEqual(2);
@@ -219,16 +223,7 @@ test('divider persists width ratio after reload', async ({ page }) => {
   expect(secondPersist.value).not.toBe(ratioValue);
 
   await page.reload({ waitUntil: 'load' });
-  await page.waitForFunction(
-    (targetWidth, tolerance) => {
-      const editor = document.getElementById('editor');
-      return (
-        !!editor && Math.abs(editor.offsetWidth - targetWidth) <= tolerance
-      );
-    },
-    narrowedMetrics.editorWidth,
-    2
-  );
+  await waitForEditorWidth(page, narrowedMetrics.editorWidth, 2);
 
   const finalMetrics = await getPaneMetrics(page);
   expect(Math.abs(finalMetrics.editorWidth - narrowedMetrics.editorWidth)).toBeLessThanOrEqual(2);
