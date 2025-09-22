@@ -38,6 +38,10 @@ function startApp() {
     { key: 'templates.releaseNotes', path: 'template/release-notes.md' }
   ];
 
+  const LAYOUT_STORAGE_KEY = 'md:layout:editorWidthRatio';
+  const MIN_EDITOR_WIDTH = 100;
+  let storedEditorWidthRatio = null;
+
   const updateDocumentTitle = () => {
     document.title = i18n.t('app.title');
   };
@@ -338,6 +342,98 @@ function startApp() {
   Preview.init();
   adjustTOCPosition();
 
+  const readStoredEditorRatio = () => {
+    try {
+      const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (raw === null) {
+        return null;
+      }
+      const parsed = parseFloat(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const writeStoredEditorRatio = ratio => {
+    if (!Number.isFinite(ratio)) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, ratio.toFixed(6));
+    } catch (error) {
+      // Ignore persistence errors, such as disabled storage.
+    }
+  };
+
+  const availableEditorWidth = () => {
+    const rect = mainContainer.getBoundingClientRect();
+    const tocWidth = toc ? toc.offsetWidth : 0;
+    const tocDividerWidth = tocDivider ? tocDivider.offsetWidth : 0;
+    const dividerWidth = divider ? divider.offsetWidth : 0;
+    return rect.width - tocWidth - tocDividerWidth - dividerWidth;
+  };
+
+  const clampEditorWidth = (width, totalAvailable) => {
+    const maxWidth = Math.max(MIN_EDITOR_WIDTH, totalAvailable - MIN_EDITOR_WIDTH);
+    if (!Number.isFinite(width)) {
+      return MIN_EDITOR_WIDTH;
+    }
+    if (width < MIN_EDITOR_WIDTH) {
+      return MIN_EDITOR_WIDTH;
+    }
+    if (width > maxWidth) {
+      return maxWidth;
+    }
+    return width;
+  };
+
+  const measureEditorRatio = () => {
+    const totalAvailable = availableEditorWidth();
+    if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+      return null;
+    }
+    const width = clampEditorWidth(editor.offsetWidth, totalAvailable);
+    const ratio = width / totalAvailable;
+    return Number.isFinite(ratio) ? ratio : null;
+  };
+
+  const applyEditorRatio = ratio => {
+    if (!Number.isFinite(ratio)) {
+      return false;
+    }
+    const totalAvailable = availableEditorWidth();
+    if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+      return false;
+    }
+    const minRatio = MIN_EDITOR_WIDTH / totalAvailable;
+    const maxRatio = (Math.max(MIN_EDITOR_WIDTH, totalAvailable - MIN_EDITOR_WIDTH)) / totalAvailable;
+    const safeRatio = Math.min(Math.max(ratio, minRatio), maxRatio);
+    const desiredWidth = clampEditorWidth(Math.round(safeRatio * totalAvailable), totalAvailable);
+    editor.style.width = `${desiredWidth}px`;
+    return true;
+  };
+
+  const persistEditorWidthRatio = () => {
+    const ratio = measureEditorRatio();
+    if (ratio === null) {
+      return;
+    }
+    storedEditorWidthRatio = ratio;
+    writeStoredEditorRatio(ratio);
+  };
+
+  const restoreEditorWidthRatio = () => {
+    const stored = readStoredEditorRatio();
+    if (stored !== null && applyEditorRatio(stored)) {
+      storedEditorWidthRatio = stored;
+    } else {
+      storedEditorWidthRatio = measureEditorRatio();
+    }
+  };
+
+  restoreEditorWidthRatio();
+
   // Enable drag to resize panes
   let isDraggingEditor = false;
   let isDraggingTOC = false;
@@ -356,7 +452,7 @@ function startApp() {
 
   document.addEventListener('mousemove', e => {
     const rect = mainContainer.getBoundingClientRect();
-    const minWidth = 100;
+    const minWidth = MIN_EDITOR_WIDTH;
     if (isDraggingEditor) {
       const tocWidth = toc.offsetWidth + tocDivider.offsetWidth;
       const dividerWidth = divider.offsetWidth;
@@ -376,10 +472,14 @@ function startApp() {
   });
 
   document.addEventListener('mouseup', () => {
+    const wasDraggingEditor = isDraggingEditor;
     if (isDraggingEditor || isDraggingTOC) {
       isDraggingEditor = false;
       isDraggingTOC = false;
       document.body.style.cursor = '';
+    }
+    if (wasDraggingEditor) {
+      persistEditorWidthRatio();
     }
   });
 
@@ -392,7 +492,12 @@ function startApp() {
     document.documentElement.style.setProperty('--header-offset', offset + 'px');
   }
 
-  window.addEventListener('resize', adjustTOCPosition);
+  window.addEventListener('resize', () => {
+    adjustTOCPosition();
+    if (storedEditorWidthRatio !== null && !isDraggingEditor) {
+      applyEditorRatio(storedEditorWidthRatio);
+    }
+  });
 
   // Update preview and expand stored Base64 images
   function handleTextStateChange(event) {

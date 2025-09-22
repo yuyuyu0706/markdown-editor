@@ -3,6 +3,12 @@ const path = require('path');
 
 const fileUrl = 'file://' + path.resolve(__dirname, '../index.html');
 const VIEWPORT = { width: 1280, height: 1024 };
+const STORAGE_IGNORE_KEYS = [
+  'md:text',
+  'md:settings',
+  'markdown-editor-language',
+  'markdown-editor-language-source',
+];
 
 async function getPaneMetrics(page) {
   return await page.evaluate(() => {
@@ -150,13 +156,6 @@ test('divider persists width ratio after reload', async ({ page }) => {
   await page.goto(fileUrl);
   await page.waitForLoadState('load');
   await page.waitForSelector('#divider');
-  await page.waitForFunction(() => {
-    try {
-      return window.localStorage.length === 0;
-    } catch (error) {
-      return false;
-    }
-  });
 
   const initialMetrics = await getPaneMetrics(page);
   const initialStorage = await getStorageSnapshot(page);
@@ -173,7 +172,9 @@ test('divider persists width ratio after reload', async ({ page }) => {
   );
   expect(Math.abs(widenedMetrics.ratio - initialMetrics.ratio)).toBeGreaterThan(0.04);
 
-  const firstPersist = await waitForStorageChange(page, initialStorage);
+  const firstPersist = await waitForStorageChange(page, initialStorage, {
+    ignoreKeys: STORAGE_IGNORE_KEYS,
+  });
   expect(firstPersist.changedKeys.length).toBeGreaterThanOrEqual(1);
   const ratioKey = firstPersist.key;
   const ratioValue = firstPersist.value;
@@ -209,7 +210,9 @@ test('divider persists width ratio after reload', async ({ page }) => {
   expect(widenedMetrics.editorWidth - narrowedMetrics.editorWidth).toBeGreaterThan(40);
   expect(Math.abs(narrowedMetrics.ratio - widenedMetrics.ratio)).toBeGreaterThan(0.04);
 
-  const secondPersist = await waitForStorageChange(page, storageAfterReload);
+  const secondPersist = await waitForStorageChange(page, storageAfterReload, {
+    ignoreKeys: STORAGE_IGNORE_KEYS,
+  });
   expect(secondPersist.changedKeys).toContain(ratioKey);
   expect(secondPersist.key).toBe(ratioKey);
   expect(secondPersist.value).not.toBeNull();
