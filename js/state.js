@@ -7,7 +7,8 @@
   };
 
   const DEFAULT_SETTINGS = {
-    lang: 'en'
+    lang: 'en',
+    showLineNumbers: false
   };
 
   const state = {

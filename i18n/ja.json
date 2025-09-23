@@ -9,7 +9,9 @@
     "insertImage": "🖼 画像を挿入",
     "template": "📋 テンプレート",
     "help": "❔ ヘルプ",
-    "languageLabel": "言語"
+    "languageLabel": "言語",
+    "showLineNumbers": "🔢 行番号ON",
+    "hideLineNumbers": "🔢 行番号OFF"
   },
   "language": {
     "english": "English",

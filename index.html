@@ -35,6 +35,14 @@
         </button>
         <div id="template-options" role="menu" aria-labelledby="template-btn" hidden></div>
       </div>
+      <button
+        id="toggle-line-numbers"
+        class="toolbar-button"
+        type="button"
+        aria-pressed="false"
+      >
+        🔢 Numbers On
+      </button>
       <button id="help-btn" class="toolbar-button" type="button" data-i18n="toolbar.help">
         ❔ Help
       </button>
@@ -56,16 +64,19 @@
   <main>
     <div id="toc"></div>
     <div id="toc-divider"></div>
-    <textarea
-      id="editor"
-      placeholder="Type Markdown here..."
-      data-i18n-placeholder="editor.placeholder"
-    ># Welcome to Markdown Editor Blue
+    <div id="editor-pane">
+      <div id="line-number-gutter" aria-hidden="true"></div>
+      <textarea
+        id="editor"
+        placeholder="Type Markdown here..."
+        data-i18n-placeholder="editor.placeholder"
+      ># Welcome to Markdown Editor Blue
 
 Capture ideas, polish documentation, and share updates with instant preview support.
 
 Happy writing
-    </textarea>
+      </textarea>
+    </div>
     <div id="divider"></div>
     <div id="preview"></div>
   </main>
