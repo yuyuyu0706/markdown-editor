@@ -11,8 +11,8 @@ if (document.readyState === 'loading') {
 
 function startApp() {
   const editor = document.getElementById('editor');
-  const editorPane = document.getElementById('editor-pane');
-  const lineNumberGutter = document.getElementById('line-number-gutter');
+  let editorPane = document.getElementById('editor-pane');
+  let lineNumberGutter = document.getElementById('line-number-gutter');
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -32,6 +32,29 @@ function startApp() {
   const markdownInput = document.getElementById('markdownInput');
   const toggleLineNumbersBtn = document.getElementById('toggle-line-numbers');
   const langSwitch = document.getElementById('lang-switch');
+
+  if (editor) {
+    if (!editorPane) {
+      editorPane = document.createElement('div');
+      editorPane.id = 'editor-pane';
+      if (editor.parentNode) {
+        editor.parentNode.insertBefore(editorPane, editor);
+      }
+      editorPane.appendChild(editor);
+    } else if (!editorPane.contains(editor)) {
+      editorPane.appendChild(editor);
+    }
+
+    if (!lineNumberGutter) {
+      lineNumberGutter = document.createElement('div');
+      lineNumberGutter.id = 'line-number-gutter';
+      lineNumberGutter.setAttribute('aria-hidden', 'true');
+    }
+
+    if (editorPane && lineNumberGutter.parentElement !== editorPane) {
+      editorPane.insertBefore(lineNumberGutter, editorPane.firstChild);
+    }
+  }
 
   const templates = [
     { key: 'templates.meetingNotes', path: 'template/meeting-notes.md' },
@@ -522,6 +545,10 @@ function startApp() {
     lineNumbersEnabled = normalized;
     if (lineNumberGutter) {
       lineNumberGutter.classList.toggle('line-numbers-visible', lineNumbersEnabled);
+      lineNumberGutter.setAttribute(
+        'aria-hidden',
+        lineNumbersEnabled ? 'false' : 'true'
+      );
       if (!lineNumbersEnabled) {
         lineNumberGutter.innerHTML = '';
         lineNumberGutter.scrollTop = 0;
