@@ -38,6 +38,10 @@ function startApp() {
     { key: 'templates.releaseNotes', path: 'template/release-notes.md' }
   ];
 
+  const LAYOUT_STORAGE_KEY = 'md:layout:editorWidthRatio';
+  const MIN_EDITOR_WIDTH = 100;
+  let storedEditorWidthRatio = null;
+
   const updateDocumentTitle = () => {
     document.title = i18n.t('app.title');
   };
@@ -338,6 +342,129 @@ function startApp() {
   Preview.init();
   adjustTOCPosition();
 
+  const readStoredEditorRatio = () => {
+    try {
+      const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (raw === null) {
+        return null;
+      }
+      const parsed = parseFloat(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const writeStoredEditorRatio = ratio => {
+    if (!Number.isFinite(ratio)) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, ratio.toFixed(6));
+    } catch (error) {
+      // Ignore persistence errors, such as disabled storage.
+    }
+  };
+
+  const getEditorHorizontalPadding = () => {
+    const styles = window.getComputedStyle(editor);
+    const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+    const paddingRight = parseFloat(styles.paddingRight) || 0;
+    return paddingLeft + paddingRight;
+  };
+
+  const getAvailableEditorWidth = () => {
+    const rect = mainContainer.getBoundingClientRect();
+    const tocWidth = toc ? toc.offsetWidth : 0;
+    const tocDividerWidth = tocDivider ? tocDivider.offsetWidth : 0;
+    const dividerWidth = divider ? divider.offsetWidth : 0;
+    const available = rect.width - tocWidth - tocDividerWidth - dividerWidth;
+    return Number.isFinite(available) ? available : 0;
+  };
+
+  const setEditorOuterWidth = width => {
+    if (!Number.isFinite(width)) {
+      return;
+    }
+    const padding = getEditorHorizontalPadding();
+    const minContentWidth = Math.max(0, MIN_EDITOR_WIDTH);
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const normalizedWidth = Math.max(minOuterWidth, Math.round(width));
+    const contentWidth = Math.max(normalizedWidth - padding, minContentWidth);
+    editor.style.width = `${contentWidth}px`;
+  };
+
+  const clampEditorWidth = (width, totalAvailable) => {
+    const padding = getEditorHorizontalPadding();
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const maxWidth = Math.max(minOuterWidth, totalAvailable - minOuterWidth);
+    if (!Number.isFinite(width)) {
+      return minOuterWidth;
+    }
+    if (width < minOuterWidth) {
+      return minOuterWidth;
+    }
+    if (width > maxWidth) {
+      return maxWidth;
+    }
+    return width;
+  };
+
+  const measureEditorRatio = () => {
+    const totalAvailable = getAvailableEditorWidth();
+    if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+      return null;
+    }
+    const width = clampEditorWidth(
+      editor.getBoundingClientRect().width,
+      totalAvailable
+    );
+    const ratio = width / totalAvailable;
+    return Number.isFinite(ratio) ? ratio : null;
+  };
+
+  const applyEditorRatio = ratio => {
+    if (!Number.isFinite(ratio)) {
+      return false;
+    }
+    const totalAvailable = getAvailableEditorWidth();
+    if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+      return false;
+    }
+    const padding = getEditorHorizontalPadding();
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const maxOuterWidth = Math.max(minOuterWidth, totalAvailable - minOuterWidth);
+    const minRatio = Math.min(minOuterWidth / totalAvailable, 1);
+    const maxRatio = Math.max(minRatio, Math.min(maxOuterWidth / totalAvailable, 1));
+    const safeRatio = Math.min(Math.max(ratio, minRatio), maxRatio);
+    const desiredWidth = clampEditorWidth(
+      Math.round(safeRatio * totalAvailable),
+      totalAvailable
+    );
+    setEditorOuterWidth(desiredWidth);
+    return true;
+  };
+
+  const persistEditorWidthRatio = () => {
+    const ratio = measureEditorRatio();
+    if (ratio === null) {
+      return;
+    }
+    storedEditorWidthRatio = ratio;
+    writeStoredEditorRatio(ratio);
+  };
+
+  const restoreEditorWidthRatio = () => {
+    const stored = readStoredEditorRatio();
+    if (stored !== null && applyEditorRatio(stored)) {
+      storedEditorWidthRatio = stored;
+    } else {
+      storedEditorWidthRatio = measureEditorRatio();
+    }
+  };
+
+  restoreEditorWidthRatio();
+
   // Enable drag to resize panes
   let isDraggingEditor = false;
   let isDraggingTOC = false;
@@ -356,15 +483,19 @@ function startApp() {
 
   document.addEventListener('mousemove', e => {
     const rect = mainContainer.getBoundingClientRect();
-    const minWidth = 100;
+    const minWidth = MIN_EDITOR_WIDTH;
     if (isDraggingEditor) {
-      const tocWidth = toc.offsetWidth + tocDivider.offsetWidth;
+      const tocWidth =
+        (toc ? toc.offsetWidth : 0) + (tocDivider ? tocDivider.offsetWidth : 0);
       const dividerWidth = divider.offsetWidth;
-      let newEditorWidth = e.clientX - rect.left - tocWidth;
-      const maxWidth = rect.width - tocWidth - dividerWidth - minWidth;
-      if (newEditorWidth < minWidth) newEditorWidth = minWidth;
-      if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
-      editor.style.width = `${newEditorWidth}px`;
+      const totalAvailable = rect.width - tocWidth - dividerWidth;
+      if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+        return;
+      }
+      const proposedWidth =
+        e.clientX - rect.left - tocWidth - dividerWidth / 2;
+      const clampedWidth = clampEditorWidth(proposedWidth, totalAvailable);
+      setEditorOuterWidth(clampedWidth);
     } else if (isDraggingTOC) {
       const dividerWidth = tocDivider.offsetWidth;
       let newTocWidth = e.clientX - rect.left;
@@ -376,10 +507,14 @@ function startApp() {
   });
 
   document.addEventListener('mouseup', () => {
+    const wasDraggingEditor = isDraggingEditor;
     if (isDraggingEditor || isDraggingTOC) {
       isDraggingEditor = false;
       isDraggingTOC = false;
       document.body.style.cursor = '';
+    }
+    if (wasDraggingEditor) {
+      persistEditorWidthRatio();
     }
   });
 
@@ -392,7 +527,12 @@ function startApp() {
     document.documentElement.style.setProperty('--header-offset', offset + 'px');
   }
 
-  window.addEventListener('resize', adjustTOCPosition);
+  window.addEventListener('resize', () => {
+    adjustTOCPosition();
+    if (storedEditorWidthRatio !== null && !isDraggingEditor) {
+      applyEditorRatio(storedEditorWidthRatio);
+    }
+  });
 
   // Update preview and expand stored Base64 images
   function handleTextStateChange(event) {
