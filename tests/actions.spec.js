@@ -23,6 +23,9 @@ async function getPaneMetrics(page) {
     if (!main || !editor || !preview || !divider) {
       throw new Error('Editor layout elements not found');
     }
+    const styles = window.getComputedStyle(editor);
+    const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+    const paddingRight = parseFloat(styles.paddingRight) || 0;
     const editorWidth = editor.offsetWidth;
     const previewWidth = preview.offsetWidth;
     const totalWidth = editorWidth + previewWidth;
@@ -37,23 +40,24 @@ async function getPaneMetrics(page) {
       previewWidth,
       totalWidth,
       availableWidth,
+      editorPadding: paddingLeft + paddingRight,
       ratio:
         availableWidth > 0 ? editorWidth / availableWidth : 0,
     };
   });
 }
 
-function calculateExpectedEditorWidth(availableWidth, storedRatio) {
+function calculateExpectedEditorWidth(availableWidth, storedRatio, padding = 0) {
   if (!Number.isFinite(availableWidth) || availableWidth <= 0) {
     return null;
   }
   if (!Number.isFinite(storedRatio)) {
     return null;
   }
-  const minWidth = MIN_EDITOR_WIDTH;
+  const minWidth = MIN_EDITOR_WIDTH + padding;
   const maxWidth = Math.max(minWidth, availableWidth - minWidth);
-  const minRatio = minWidth / availableWidth;
-  const maxRatio = maxWidth / availableWidth;
+  const minRatio = Math.min(minWidth / availableWidth, 1);
+  const maxRatio = Math.max(minRatio, Math.min(maxWidth / availableWidth, 1));
   const safeRatio = Math.min(Math.max(storedRatio, minRatio), maxRatio);
   const desiredWidth = Math.round(safeRatio * availableWidth);
   const clampedWidth = Math.min(
@@ -236,7 +240,8 @@ test('divider persists width ratio after reload', async ({ page }) => {
   const reloadedMetrics = await getPaneMetrics(page);
   const expectedReloadedWidth = calculateExpectedEditorWidth(
     reloadedMetrics.availableWidth,
-    storedRatioAfterExpand
+    storedRatioAfterExpand,
+    reloadedMetrics.editorPadding
   );
   expect(expectedReloadedWidth).not.toBeNull();
   expect(
@@ -273,7 +278,8 @@ test('divider persists width ratio after reload', async ({ page }) => {
   const finalMetrics = await getPaneMetrics(page);
   const expectedFinalWidth = calculateExpectedEditorWidth(
     finalMetrics.availableWidth,
-    storedRatioAfterContract
+    storedRatioAfterContract,
+    finalMetrics.editorPadding
   );
   expect(expectedFinalWidth).not.toBeNull();
   expect(Math.abs(finalMetrics.editorWidth - expectedFinalWidth)).toBeLessThanOrEqual(2);

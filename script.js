@@ -366,21 +366,43 @@ function startApp() {
     }
   };
 
-  const availableEditorWidth = () => {
+  const getEditorHorizontalPadding = () => {
+    const styles = window.getComputedStyle(editor);
+    const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+    const paddingRight = parseFloat(styles.paddingRight) || 0;
+    return paddingLeft + paddingRight;
+  };
+
+  const getAvailableEditorWidth = () => {
     const rect = mainContainer.getBoundingClientRect();
     const tocWidth = toc ? toc.offsetWidth : 0;
     const tocDividerWidth = tocDivider ? tocDivider.offsetWidth : 0;
     const dividerWidth = divider ? divider.offsetWidth : 0;
-    return rect.width - tocWidth - tocDividerWidth - dividerWidth;
+    const available = rect.width - tocWidth - tocDividerWidth - dividerWidth;
+    return Number.isFinite(available) ? available : 0;
+  };
+
+  const setEditorOuterWidth = width => {
+    if (!Number.isFinite(width)) {
+      return;
+    }
+    const padding = getEditorHorizontalPadding();
+    const minContentWidth = Math.max(0, MIN_EDITOR_WIDTH);
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const normalizedWidth = Math.max(minOuterWidth, Math.round(width));
+    const contentWidth = Math.max(normalizedWidth - padding, minContentWidth);
+    editor.style.width = `${contentWidth}px`;
   };
 
   const clampEditorWidth = (width, totalAvailable) => {
-    const maxWidth = Math.max(MIN_EDITOR_WIDTH, totalAvailable - MIN_EDITOR_WIDTH);
+    const padding = getEditorHorizontalPadding();
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const maxWidth = Math.max(minOuterWidth, totalAvailable - minOuterWidth);
     if (!Number.isFinite(width)) {
-      return MIN_EDITOR_WIDTH;
+      return minOuterWidth;
     }
-    if (width < MIN_EDITOR_WIDTH) {
-      return MIN_EDITOR_WIDTH;
+    if (width < minOuterWidth) {
+      return minOuterWidth;
     }
     if (width > maxWidth) {
       return maxWidth;
@@ -389,11 +411,14 @@ function startApp() {
   };
 
   const measureEditorRatio = () => {
-    const totalAvailable = availableEditorWidth();
+    const totalAvailable = getAvailableEditorWidth();
     if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
       return null;
     }
-    const width = clampEditorWidth(editor.offsetWidth, totalAvailable);
+    const width = clampEditorWidth(
+      editor.getBoundingClientRect().width,
+      totalAvailable
+    );
     const ratio = width / totalAvailable;
     return Number.isFinite(ratio) ? ratio : null;
   };
@@ -402,15 +427,21 @@ function startApp() {
     if (!Number.isFinite(ratio)) {
       return false;
     }
-    const totalAvailable = availableEditorWidth();
+    const totalAvailable = getAvailableEditorWidth();
     if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
       return false;
     }
-    const minRatio = MIN_EDITOR_WIDTH / totalAvailable;
-    const maxRatio = (Math.max(MIN_EDITOR_WIDTH, totalAvailable - MIN_EDITOR_WIDTH)) / totalAvailable;
+    const padding = getEditorHorizontalPadding();
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const maxOuterWidth = Math.max(minOuterWidth, totalAvailable - minOuterWidth);
+    const minRatio = Math.min(minOuterWidth / totalAvailable, 1);
+    const maxRatio = Math.max(minRatio, Math.min(maxOuterWidth / totalAvailable, 1));
     const safeRatio = Math.min(Math.max(ratio, minRatio), maxRatio);
-    const desiredWidth = clampEditorWidth(Math.round(safeRatio * totalAvailable), totalAvailable);
-    editor.style.width = `${desiredWidth}px`;
+    const desiredWidth = clampEditorWidth(
+      Math.round(safeRatio * totalAvailable),
+      totalAvailable
+    );
+    setEditorOuterWidth(desiredWidth);
     return true;
   };
 
@@ -454,13 +485,17 @@ function startApp() {
     const rect = mainContainer.getBoundingClientRect();
     const minWidth = MIN_EDITOR_WIDTH;
     if (isDraggingEditor) {
-      const tocWidth = toc.offsetWidth + tocDivider.offsetWidth;
+      const tocWidth =
+        (toc ? toc.offsetWidth : 0) + (tocDivider ? tocDivider.offsetWidth : 0);
       const dividerWidth = divider.offsetWidth;
-      let newEditorWidth = e.clientX - rect.left - tocWidth;
-      const maxWidth = rect.width - tocWidth - dividerWidth - minWidth;
-      if (newEditorWidth < minWidth) newEditorWidth = minWidth;
-      if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
-      editor.style.width = `${newEditorWidth}px`;
+      const totalAvailable = rect.width - tocWidth - dividerWidth;
+      if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+        return;
+      }
+      const proposedWidth =
+        e.clientX - rect.left - tocWidth - dividerWidth / 2;
+      const clampedWidth = clampEditorWidth(proposedWidth, totalAvailable);
+      setEditorOuterWidth(clampedWidth);
     } else if (isDraggingTOC) {
       const dividerWidth = tocDivider.offsetWidth;
       let newTocWidth = e.clientX - rect.left;
