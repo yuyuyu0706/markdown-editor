@@ -45,6 +45,9 @@
     "mermaidTitle": "Mermaid チートシート",
     "mermaidCheatsheet": "```mermaid\ngraph TD\n  A[開始] --> B{条件}\n  B -->|はい| C[処理1]\n  B -->|いいえ| D[処理2]\n```"
   },
+  "formatting": {
+    "bold": "太字"
+  },
   "image": {
     "fallback": "[画像: {filename}]",
     "markdownTemplate": "\n<!-- image:{filename} -->\n[画像: {filename}]\n<!-- /image -->\n"

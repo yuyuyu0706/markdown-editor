@@ -539,6 +539,245 @@ function startApp() {
     syncLineNumberScroll();
   };
 
+  let formattingMenuElement = null;
+  let formattingBoldButton = null;
+  let formattingMenuVisible = false;
+
+  function getEditorSelectionLength() {
+    if (!editor) {
+      return 0;
+    }
+    return Math.abs(editor.selectionEnd - editor.selectionStart);
+  }
+
+  function updateFormattingMenuState() {
+    if (!formattingBoldButton) {
+      return;
+    }
+    const selectionLength = getEditorSelectionLength();
+    formattingBoldButton.disabled = selectionLength === 0;
+    formattingBoldButton.setAttribute(
+      'aria-disabled',
+      selectionLength === 0 ? 'true' : 'false'
+    );
+  }
+
+  function hideFormattingMenu() {
+    if (!formattingMenuElement || !formattingMenuVisible) {
+      return;
+    }
+    formattingMenuElement.classList.remove('visible');
+    formattingMenuElement.style.visibility = '';
+    formattingMenuElement.style.left = '';
+    formattingMenuElement.style.top = '';
+    formattingMenuElement.setAttribute('aria-hidden', 'true');
+    formattingMenuVisible = false;
+  }
+
+  function showFormattingMenu(clientX, clientY) {
+    if (!formattingMenuElement) {
+      return;
+    }
+
+    updateFormattingMenuState();
+
+    const scrollX = window.pageXOffset || window.scrollX || 0;
+    const scrollY = window.pageYOffset || window.scrollY || 0;
+    const viewportPadding = 8;
+
+    let targetLeft = scrollX + clientX;
+    let targetTop = scrollY + clientY;
+
+    formattingMenuElement.classList.add('visible');
+    formattingMenuElement.style.visibility = 'hidden';
+    formattingMenuElement.style.left = `${targetLeft}px`;
+    formattingMenuElement.style.top = `${targetTop}px`;
+
+    const rect = formattingMenuElement.getBoundingClientRect();
+    const viewportRight = scrollX + window.innerWidth;
+    const viewportBottom = scrollY + window.innerHeight;
+
+    if (rect.right > viewportRight - viewportPadding) {
+      targetLeft = Math.max(
+        scrollX + viewportPadding,
+        viewportRight - rect.width - viewportPadding
+      );
+    }
+    if (rect.bottom > viewportBottom - viewportPadding) {
+      targetTop = Math.max(
+        scrollY + viewportPadding,
+        viewportBottom - rect.height - viewportPadding
+      );
+    }
+    if (targetLeft < scrollX + viewportPadding) {
+      targetLeft = scrollX + viewportPadding;
+    }
+    if (targetTop < scrollY + viewportPadding) {
+      targetTop = scrollY + viewportPadding;
+    }
+
+    formattingMenuElement.style.left = `${targetLeft}px`;
+    formattingMenuElement.style.top = `${targetTop}px`;
+    formattingMenuElement.style.visibility = 'visible';
+    formattingMenuElement.setAttribute('aria-hidden', 'false');
+    formattingMenuVisible = true;
+  }
+
+  function applyBoldFormatting() {
+    if (!editor) {
+      return;
+    }
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    if (typeof start !== 'number' || typeof end !== 'number') {
+      return;
+    }
+
+    const selectionStart = Math.min(start, end);
+    const selectionEnd = Math.max(start, end);
+    const previousValue = editor.value || '';
+    const selectedText = previousValue.slice(selectionStart, selectionEnd);
+    const prevScrollTop = editor.scrollTop;
+
+    let nextValue = previousValue;
+    let nextSelectionStart = selectionStart;
+    let nextSelectionEnd = selectionEnd;
+
+    if (selectionStart === selectionEnd) {
+      const insertion = '****';
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        insertion +
+        previousValue.slice(selectionEnd);
+      nextSelectionStart = selectionStart + 2;
+      nextSelectionEnd = nextSelectionStart;
+    } else if (
+      selectedText.startsWith('**') &&
+      selectedText.endsWith('**') &&
+      selectedText.length >= 4
+    ) {
+      const innerText = selectedText.slice(2, -2);
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        innerText +
+        previousValue.slice(selectionEnd);
+      nextSelectionEnd = nextSelectionStart + innerText.length;
+    } else {
+      const wrapped = `**${selectedText}**`;
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        wrapped +
+        previousValue.slice(selectionEnd);
+      nextSelectionEnd = nextSelectionStart + wrapped.length;
+    }
+
+    editor.value = nextValue;
+    editor.scrollTop = prevScrollTop;
+    editor.selectionStart = nextSelectionStart;
+    editor.selectionEnd = nextSelectionEnd;
+
+    AppState.setText(nextValue, 'editor');
+    updateLineNumbers();
+
+    try {
+      editor.focus({ preventScroll: true });
+    } catch (error) {
+      editor.focus();
+    }
+  }
+
+  function handleEditorContextMenu(event) {
+    if (!editor) {
+      return;
+    }
+    event.preventDefault();
+    showFormattingMenu(event.clientX, event.clientY);
+  }
+
+  function handleEditorMouseUp(event) {
+    if (event.button !== 0) {
+      return;
+    }
+    if (getEditorSelectionLength() === 0) {
+      hideFormattingMenu();
+      return;
+    }
+    showFormattingMenu(event.clientX, event.clientY);
+  }
+
+  function handleEditorSelect() {
+    updateFormattingMenuState();
+    if (formattingMenuVisible && getEditorSelectionLength() === 0) {
+      hideFormattingMenu();
+    }
+  }
+
+  function handleEditorBlur() {
+    hideFormattingMenu();
+  }
+
+  function handleDocumentPointerDown(event) {
+    if (!formattingMenuVisible || !formattingMenuElement) {
+      return;
+    }
+    if (formattingMenuElement.contains(event.target)) {
+      return;
+    }
+    hideFormattingMenu();
+  }
+
+  function handleDocumentScroll() {
+    hideFormattingMenu();
+  }
+
+  function handleDocumentKeyDown(event) {
+    if (event.key === 'Escape') {
+      hideFormattingMenu();
+    }
+  }
+
+  function initializeFormattingMenu() {
+    if (!editor || formattingMenuElement) {
+      return;
+    }
+
+    const menu = document.createElement('div');
+    menu.id = 'formatting-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-hidden', 'true');
+
+    const boldButton = document.createElement('button');
+    boldButton.type = 'button';
+    boldButton.className = 'formatting-menu-button';
+    boldButton.dataset.action = 'bold';
+    boldButton.dataset.i18n = 'formatting.bold';
+    boldButton.setAttribute('role', 'menuitem');
+    boldButton.textContent = i18n.t('formatting.bold');
+    boldButton.addEventListener('click', () => {
+      applyBoldFormatting();
+      hideFormattingMenu();
+    });
+
+    menu.appendChild(boldButton);
+    document.body.appendChild(menu);
+    i18n.applyToDOM(menu);
+
+    formattingMenuElement = menu;
+    formattingBoldButton = boldButton;
+
+    updateFormattingMenuState();
+
+    editor.addEventListener('contextmenu', handleEditorContextMenu);
+    editor.addEventListener('mouseup', handleEditorMouseUp);
+    editor.addEventListener('select', handleEditorSelect);
+    editor.addEventListener('blur', handleEditorBlur);
+
+    document.addEventListener('mousedown', handleDocumentPointerDown, true);
+    document.addEventListener('scroll', handleDocumentScroll, true);
+    document.addEventListener('keydown', handleDocumentKeyDown, true);
+    window.addEventListener('resize', hideFormattingMenu);
+  }
+
   const applyLineNumbersEnabled = next => {
     const normalized = Boolean(next);
     const stateChanged = lineNumbersEnabled !== normalized;
@@ -593,6 +832,8 @@ function startApp() {
   };
 
   restoreEditorWidthRatio();
+
+  initializeFormattingMenu();
 
   // Enable drag to resize panes
   let isDraggingEditor = false;
@@ -817,10 +1058,12 @@ function startApp() {
   }
 
   editor.addEventListener('input', () => {
+    hideFormattingMenu();
     AppState.setText(editor.value, 'editor');
     updateLineNumbers();
   });
   editor.addEventListener('scroll', () => {
+    hideFormattingMenu();
     syncLineNumberScroll();
   });
 
@@ -898,6 +1141,13 @@ function startApp() {
     return true;
   }
   editor.addEventListener('keydown', event => {
+    if (formattingMenuVisible) {
+      const modifierKeys = ['Shift', 'Control', 'Alt', 'Meta'];
+      if (!modifierKeys.includes(event.key)) {
+        hideFormattingMenu();
+      }
+    }
+
     if (
       event.key === 'PageDown' ||
       event.key === 'PageUp' ||
