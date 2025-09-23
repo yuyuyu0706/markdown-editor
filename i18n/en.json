@@ -10,8 +10,8 @@
     "template": "📋 Templates",
     "help": "❔ Help",
     "languageLabel": "Language",
-    "showLineNumbers": "🔢 Show Line Numbers",
-    "hideLineNumbers": "🔢 Hide Line Numbers"
+    "showLineNumbers": "🔢 Numbers On",
+    "hideLineNumbers": "🔢 Numbers Off"
   },
   "language": {
     "english": "English",
