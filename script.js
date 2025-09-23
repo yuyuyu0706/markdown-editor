@@ -11,6 +11,8 @@ if (document.readyState === 'loading') {
 
 function startApp() {
   const editor = document.getElementById('editor');
+  const editorPane = document.getElementById('editor-pane');
+  const lineNumberGutter = document.getElementById('line-number-gutter');
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -28,6 +30,7 @@ function startApp() {
   const templateBtn = document.getElementById('template-btn');
   const templateOptions = document.getElementById('template-options');
   const markdownInput = document.getElementById('markdownInput');
+  const toggleLineNumbersBtn = document.getElementById('toggle-line-numbers');
   const langSwitch = document.getElementById('lang-switch');
 
   const templates = [
@@ -41,6 +44,7 @@ function startApp() {
   const LAYOUT_STORAGE_KEY = 'md:layout:editorWidthRatio';
   const MIN_EDITOR_WIDTH = 100;
   let storedEditorWidthRatio = null;
+  let lineNumbersEnabled = false;
 
   const updateDocumentTitle = () => {
     document.title = i18n.t('app.title');
@@ -333,6 +337,7 @@ function startApp() {
       buildTemplateOptions();
     }
     adjustTOCPosition();
+    updateLineNumberButtonLabel();
   });
 
   let headings = [];
@@ -367,10 +372,25 @@ function startApp() {
   };
 
   const getEditorHorizontalPadding = () => {
+    if (!editor) {
+      return 0;
+    }
     const styles = window.getComputedStyle(editor);
     const paddingLeft = parseFloat(styles.paddingLeft) || 0;
     const paddingRight = parseFloat(styles.paddingRight) || 0;
     return paddingLeft + paddingRight;
+  };
+
+  const getLineNumberGutterWidth = () => {
+    if (!lineNumberGutter) {
+      return 0;
+    }
+    const styles = window.getComputedStyle(lineNumberGutter);
+    if (styles.display === 'none') {
+      return 0;
+    }
+    const rect = lineNumberGutter.getBoundingClientRect();
+    return Number.isFinite(rect.width) ? rect.width : 0;
   };
 
   const getAvailableEditorWidth = () => {
@@ -387,16 +407,26 @@ function startApp() {
       return;
     }
     const padding = getEditorHorizontalPadding();
+    const gutterWidth = getLineNumberGutterWidth();
     const minContentWidth = Math.max(0, MIN_EDITOR_WIDTH);
-    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding + gutterWidth;
     const normalizedWidth = Math.max(minOuterWidth, Math.round(width));
-    const contentWidth = Math.max(normalizedWidth - padding, minContentWidth);
-    editor.style.width = `${contentWidth}px`;
+    const contentWidth = Math.max(
+      normalizedWidth - padding - gutterWidth,
+      minContentWidth
+    );
+    if (editorPane) {
+      editorPane.style.width = `${normalizedWidth}px`;
+    }
+    if (editor) {
+      editor.style.width = `${contentWidth}px`;
+    }
   };
 
   const clampEditorWidth = (width, totalAvailable) => {
     const padding = getEditorHorizontalPadding();
-    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const gutterWidth = getLineNumberGutterWidth();
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding + gutterWidth;
     const maxWidth = Math.max(minOuterWidth, totalAvailable - minOuterWidth);
     if (!Number.isFinite(width)) {
       return minOuterWidth;
@@ -415,8 +445,9 @@ function startApp() {
     if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
       return null;
     }
+    const reference = editorPane || editor;
     const width = clampEditorWidth(
-      editor.getBoundingClientRect().width,
+      reference ? reference.getBoundingClientRect().width : 0,
       totalAvailable
     );
     const ratio = width / totalAvailable;
@@ -432,7 +463,8 @@ function startApp() {
       return false;
     }
     const padding = getEditorHorizontalPadding();
-    const minOuterWidth = MIN_EDITOR_WIDTH + padding;
+    const gutterWidth = getLineNumberGutterWidth();
+    const minOuterWidth = MIN_EDITOR_WIDTH + padding + gutterWidth;
     const maxOuterWidth = Math.max(minOuterWidth, totalAvailable - minOuterWidth);
     const minRatio = Math.min(minOuterWidth / totalAvailable, 1);
     const maxRatio = Math.max(minRatio, Math.min(maxOuterWidth / totalAvailable, 1));
@@ -443,6 +475,76 @@ function startApp() {
     );
     setEditorOuterWidth(desiredWidth);
     return true;
+  };
+
+  const syncLineNumberScroll = () => {
+    if (!lineNumbersEnabled || !lineNumberGutter || !editor) {
+      return;
+    }
+    lineNumberGutter.scrollTop = editor.scrollTop;
+  };
+
+  const updateLineNumberButtonLabel = () => {
+    if (!toggleLineNumbersBtn) {
+      return;
+    }
+    const key = lineNumbersEnabled
+      ? 'toolbar.hideLineNumbers'
+      : 'toolbar.showLineNumbers';
+    toggleLineNumbersBtn.textContent = i18n.t(key);
+    toggleLineNumbersBtn.setAttribute(
+      'aria-pressed',
+      lineNumbersEnabled ? 'true' : 'false'
+    );
+  };
+
+  const updateLineNumbers = () => {
+    if (!lineNumbersEnabled || !lineNumberGutter || !editor) {
+      return;
+    }
+    const rawValue = editor.value || '';
+    const lineCount = Math.max(1, rawValue.split('\n').length);
+    const currentCount = Number(lineNumberGutter.dataset.count || 0);
+    if (currentCount !== lineCount) {
+      const numbers = [];
+      for (let i = 1; i <= lineCount; i += 1) {
+        numbers.push(`<span class="line-number">${i}</span>`);
+      }
+      lineNumberGutter.innerHTML = numbers.join('');
+      lineNumberGutter.dataset.count = String(lineCount);
+    }
+    syncLineNumberScroll();
+  };
+
+  const applyLineNumbersEnabled = next => {
+    const normalized = Boolean(next);
+    const stateChanged = lineNumbersEnabled !== normalized;
+    lineNumbersEnabled = normalized;
+    if (lineNumberGutter) {
+      lineNumberGutter.classList.toggle('line-numbers-visible', lineNumbersEnabled);
+      if (!lineNumbersEnabled) {
+        lineNumberGutter.innerHTML = '';
+        lineNumberGutter.scrollTop = 0;
+        delete lineNumberGutter.dataset.count;
+      }
+    }
+    updateLineNumberButtonLabel();
+    if (lineNumbersEnabled) {
+      updateLineNumbers();
+    }
+    if (stateChanged && editorPane) {
+      const currentWidth = editorPane.getBoundingClientRect().width;
+      setEditorOuterWidth(currentWidth);
+    }
+  };
+
+  const setLineNumbersEnabled = next => {
+    const normalized = Boolean(next);
+    if (normalized === lineNumbersEnabled) {
+      return;
+    }
+    applyLineNumbersEnabled(normalized);
+    AppState.setSetting('showLineNumbers', normalized);
   };
 
   const persistEditorWidthRatio = () => {
@@ -483,7 +585,6 @@ function startApp() {
 
   document.addEventListener('mousemove', e => {
     const rect = mainContainer.getBoundingClientRect();
-    const minWidth = MIN_EDITOR_WIDTH;
     if (isDraggingEditor) {
       const tocWidth =
         (toc ? toc.offsetWidth : 0) + (tocDivider ? tocDivider.offsetWidth : 0);
@@ -499,8 +600,18 @@ function startApp() {
     } else if (isDraggingTOC) {
       const dividerWidth = tocDivider.offsetWidth;
       let newTocWidth = e.clientX - rect.left;
-      const maxWidth = rect.width - dividerWidth - divider.offsetWidth - editor.offsetWidth - minWidth;
-      if (newTocWidth < minWidth) newTocWidth = minWidth;
+      const editorOuterWidth = editorPane ? editorPane.offsetWidth : editor.offsetWidth;
+      const padding = getEditorHorizontalPadding();
+      const gutterWidth = getLineNumberGutterWidth();
+      const minPreviewOuter = MIN_EDITOR_WIDTH + padding + gutterWidth;
+      const minTocWidth = MIN_EDITOR_WIDTH;
+      const maxWidth =
+        rect.width -
+        dividerWidth -
+        divider.offsetWidth -
+        editorOuterWidth -
+        minPreviewOuter;
+      if (newTocWidth < minTocWidth) newTocWidth = minTocWidth;
       if (newTocWidth > maxWidth) newTocWidth = maxWidth;
       toc.style.width = `${newTocWidth}px`;
     }
@@ -556,6 +667,8 @@ function startApp() {
         editor.scrollTop = prevScrollTop;
       }
     }
+    updateLineNumbers();
+    syncLineNumberScroll();
     Preview.render(text);
     buildTOC();
     updateTOCHighlight();
@@ -678,6 +791,10 @@ function startApp() {
 
   editor.addEventListener('input', () => {
     AppState.setText(editor.value, 'editor');
+    updateLineNumbers();
+  });
+  editor.addEventListener('scroll', () => {
+    syncLineNumberScroll();
   });
 
   function continueListOnEnter(event) {
@@ -843,6 +960,12 @@ function startApp() {
     helpWindow.classList.add('hidden');
   });
 
+  if (toggleLineNumbersBtn) {
+    toggleLineNumbersBtn.addEventListener('click', () => {
+      setLineNumbersEnabled(!lineNumbersEnabled);
+    });
+  }
+
   Bus.on('text:changed', handleTextStateChange);
 
   Bus.on('toc:jump', event => {
@@ -853,11 +976,15 @@ function startApp() {
   });
 
   Bus.on('settings:changed', event => {
-    if (!event || event.key !== 'lang') {
+    if (!event || typeof event.key !== 'string') {
       return;
     }
-    if (langSwitch && typeof event.value === 'string') {
-      langSwitch.value = event.value;
+    if (event.key === 'lang') {
+      if (langSwitch && typeof event.value === 'string') {
+        langSwitch.value = event.value;
+      }
+    } else if (event.key === 'showLineNumbers') {
+      applyLineNumbersEnabled(Boolean(event.value));
     }
   });
 
@@ -865,6 +992,9 @@ function startApp() {
     text: editor.value,
     settings: { lang: i18n.getCurrentLang() }
   });
+
+  const initialSettings = AppState.getSettings();
+  applyLineNumbersEnabled(Boolean(initialSettings.showLineNumbers));
 
 }
 

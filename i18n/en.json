@@ -9,7 +9,9 @@
     "insertImage": "🖼 Insert Image",
     "template": "📋 Templates",
     "help": "❔ Help",
-    "languageLabel": "Language"
+    "languageLabel": "Language",
+    "showLineNumbers": "🔢 Show Line Numbers",
+    "hideLineNumbers": "🔢 Hide Line Numbers"
   },
   "language": {
     "english": "English",

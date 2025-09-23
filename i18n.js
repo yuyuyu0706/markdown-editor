@@ -14,7 +14,9 @@
         insertImage: '🖼 Insert Image',
         template: '📋 Templates',
         help: '❔ Help',
-        languageLabel: 'Language'
+        languageLabel: 'Language',
+        showLineNumbers: '🔢 Show Line Numbers',
+        hideLineNumbers: '🔢 Hide Line Numbers'
       },
       language: {
         english: 'English',
@@ -69,7 +71,9 @@
         insertImage: '🖼 画像を挿入',
         template: '📋 テンプレート',
         help: '❔ ヘルプ',
-        languageLabel: '言語'
+        languageLabel: '言語',
+        showLineNumbers: '🔢 行番号を表示',
+        hideLineNumbers: '🔢 行番号を非表示'
       },
       language: {
         english: 'English',
