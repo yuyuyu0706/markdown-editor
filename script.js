@@ -554,12 +554,12 @@ function startApp() {
     if (!formattingBoldButton) {
       return;
     }
-    const selectionLength = getEditorSelectionLength();
-    formattingBoldButton.disabled = selectionLength === 0;
-    formattingBoldButton.setAttribute(
-      'aria-disabled',
-      selectionLength === 0 ? 'true' : 'false'
-    );
+    if (formattingBoldButton.disabled) {
+      formattingBoldButton.disabled = false;
+    }
+    if (formattingBoldButton.getAttribute('aria-disabled') !== null) {
+      formattingBoldButton.removeAttribute('aria-disabled');
+    }
   }
 
   function hideFormattingMenu() {
