@@ -54,6 +54,9 @@
         mermaidCheatsheet:
           '```mermaid\ngraph TD\n  A[Start] --> B{Condition}\n  B -->|Yes| C[Process 1]\n  B -->|No| D[Process 2]\n```'
       },
+      formatting: {
+        bold: '𝐁 Bold'
+      },
       image: {
         fallback: '[Image: {filename}]',
         markdownTemplate:
@@ -110,6 +113,9 @@
         mermaidTitle: 'Mermaid チートシート',
         mermaidCheatsheet:
           '```mermaid\ngraph TD\n  A[開始] --> B{条件}\n  B -->|はい| C[処理1]\n  B -->|いいえ| D[処理2]\n```'
+      },
+      formatting: {
+        bold: '太字'
       },
       image: {
         fallback: '[画像: {filename}]',
