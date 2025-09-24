@@ -712,7 +712,15 @@ function startApp() {
     }
   }
 
-  function handleEditorBlur() {
+  function handleEditorBlur(event) {
+    if (
+      formattingMenuElement &&
+      event &&
+      event.relatedTarget &&
+      formattingMenuElement.contains(event.relatedTarget)
+    ) {
+      return;
+    }
     hideFormattingMenu();
   }
 
