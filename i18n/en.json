@@ -45,6 +45,9 @@
     "mermaidTitle": "Mermaid Cheat Sheet",
     "mermaidCheatsheet": "```mermaid\ngraph TD\n  A[Start] --> B{Condition}\n  B -->|Yes| C[Process 1]\n  B -->|No| D[Process 2]\n```"
   },
+  "formatting": {
+    "bold": "𝐁 Bold"
+  },
   "image": {
     "fallback": "[Image: {filename}]",
     "markdownTemplate": "\n<!-- image:{filename} -->\n[Image: {filename}]\n<!-- /image -->\n"

@@ -115,6 +115,52 @@ body {
   outline: none;
 }
 
+#formatting-menu {
+  position: absolute;
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  background: #ffffff;
+  border: 1px solid #aac8ff;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  min-width: 140px;
+  z-index: 1500;
+}
+
+#formatting-menu.visible {
+  display: flex;
+}
+
+.formatting-menu-button {
+  background: transparent;
+  border: none;
+  color: #003366;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.formatting-menu-button:hover,
+.formatting-menu-button:focus-visible {
+  background: #e6f0ff;
+  outline: none;
+}
+
+.formatting-menu-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+  background: transparent;
+}
+
+.formatting-menu-button:disabled:hover,
+.formatting-menu-button:disabled:focus-visible {
+  background: transparent;
+}
+
 main {
   display: flex;
   flex: 1;
