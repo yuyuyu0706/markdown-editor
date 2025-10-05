@@ -22,6 +22,7 @@ function startApp() {
   const toc = document.getElementById('toc');
   const toolbar = document.getElementById('toolbar');
   const exportPdfBtn = document.getElementById('export-pdf');
+  const exportHtmlBtn = document.getElementById('export-html');
   const saveMdBtn = document.getElementById('save-md');
   const openMdBtn = document.getElementById('open-md');
   const helpBtn = document.getElementById('help-btn');
@@ -1200,25 +1201,61 @@ function startApp() {
     reader.readAsDataURL(file);
   });
 
-  exportPdfBtn.addEventListener('click', () => {
-    const win = window.open('', '', 'width=800,height=600');
-    if (!win) {
-      return;
-    }
-    const cssHref = document.querySelector('link[rel="stylesheet"]').href;
-    const previewTitle = i18n.t('dialogs.previewTitle');
-    const langAttr =
-      document.documentElement.getAttribute('lang') || i18n.getCurrentLang();
-    win.document.write(
-      `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title><link rel="stylesheet" href="${cssHref}"></head><body>${preview.innerHTML}</body></html>`
-    );
-    win.document.close();
-    win.onload = () => {
-      win.focus();
-      win.print();
-      win.close();
-    };
-  });
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', () => {
+      const win = window.open('', '', 'width=800,height=600');
+      if (!win) {
+        return;
+      }
+      const cssLink = document.querySelector('link[rel="stylesheet"]');
+      const cssHref = cssLink ? cssLink.href : '';
+      const previewTitle = i18n.t('dialogs.previewTitle');
+      const langAttr =
+        document.documentElement.getAttribute('lang') || i18n.getCurrentLang();
+      const linkTag = cssHref
+        ? `<link rel="stylesheet" href="${cssHref}">`
+        : '';
+      win.document.write(
+        `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${linkTag}</head><body>${preview.innerHTML}</body></html>`
+      );
+      win.document.close();
+      win.onload = () => {
+        win.focus();
+        win.print();
+        win.close();
+      };
+    });
+  }
+
+  if (exportHtmlBtn) {
+    exportHtmlBtn.addEventListener('click', () => {
+      const previewTitle = i18n.t('dialogs.previewTitle');
+      const langAttr =
+        document.documentElement.getAttribute('lang') || i18n.getCurrentLang();
+      const cssLink = document.querySelector('link[rel="stylesheet"]');
+      const cssHref = cssLink ? cssLink.href : '';
+      const linkTag = cssHref
+        ? `<link rel="stylesheet" href="${cssHref}">`
+        : '';
+      const html =
+        `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${linkTag}</head><body>${preview.innerHTML}</body></html>`;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const defaultName = i18n.t('dialogs.defaultHtmlFileName');
+      const trimmedName =
+        typeof defaultName === 'string' && defaultName.trim()
+          ? defaultName.trim()
+          : 'preview.html';
+      const filename = trimmedName.endsWith('.html')
+        ? trimmedName
+        : `${trimmedName}.html`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
 
   saveMdBtn.addEventListener('click', () => {
     const defaultName = i18n.t('dialogs.defaultFileName');
