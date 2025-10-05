@@ -177,6 +177,7 @@ test('exports preview HTML via button', async ({ page }) => {
   const html = await fs.readFile(targetPath, 'utf8');
   expect(html).toContain('<!DOCTYPE html>');
   expect(html).toContain('Welcome to Markdown Editor Blue');
+  expect(html).toMatch(/<style>[\s\S]*pre \{/);
 });
 
 test('inserts image into preview', async ({ page }) => {

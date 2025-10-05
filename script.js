@@ -1268,8 +1268,45 @@ function startApp() {
     });
   }
 
+  async function getInlineStylesheetContent() {
+    const link = document.querySelector('link[rel="stylesheet"]');
+    if (!link) {
+      return '';
+    }
+
+    const { sheet } = link;
+    if (sheet) {
+      try {
+        const rules = sheet.cssRules || sheet.rules;
+        if (rules && rules.length) {
+          return Array.from(rules)
+            .map(rule => rule.cssText)
+            .join('\n');
+        }
+      } catch (error) {
+        console.warn('[Export] Unable to read stylesheet rules directly.', error);
+      }
+    }
+
+    const href = typeof link.href === 'string' ? link.href : '';
+    if (!href) {
+      return '';
+    }
+
+    try {
+      const response = await fetch(href, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Stylesheet request failed with status ${response.status}`);
+      }
+      return await response.text();
+    } catch (error) {
+      console.warn('[Export] Failed to fetch stylesheet for HTML export.', error);
+      return '';
+    }
+  }
+
   if (exportHtmlBtn) {
-    exportHtmlBtn.addEventListener('click', () => {
+    exportHtmlBtn.addEventListener('click', async () => {
       try {
         if (!preview) {
           throw new Error('Preview element is not available.');
@@ -1280,11 +1317,16 @@ function startApp() {
           document.documentElement.getAttribute('lang') || i18n.getCurrentLang();
         const cssLink = document.querySelector('link[rel="stylesheet"]');
         const cssHref = cssLink ? cssLink.href : '';
-        const linkTag = cssHref
-          ? `<link rel="stylesheet" href="${cssHref}">`
-          : '';
+        const inlineStyles = await getInlineStylesheetContent();
+        let headStyles = '';
+        if (inlineStyles) {
+          const sanitized = inlineStyles.replace(/<\/style/gi, '<\\/style');
+          headStyles = `<style>${sanitized}</style>`;
+        } else if (cssHref) {
+          headStyles = `<link rel="stylesheet" href="${cssHref}">`;
+        }
         const html =
-          `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${linkTag}</head><body>${preview.innerHTML}</body></html>`;
+          `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${headStyles}</head><body>${preview.innerHTML}</body></html>`;
 
         const defaultName = i18n.t('dialogs.defaultHtmlFileName');
         const trimmedName =
