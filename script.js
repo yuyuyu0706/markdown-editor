@@ -1293,14 +1293,55 @@ function startApp() {
       return '';
     }
 
-    try {
+    const fetchStylesheet = async () => {
+      if (typeof fetch !== 'function') {
+        return '';
+      }
+
       const response = await fetch(href, { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Stylesheet request failed with status ${response.status}`);
       }
+
       return await response.text();
+    };
+
+    try {
+      return await fetchStylesheet();
     } catch (error) {
       console.warn('[Export] Failed to fetch stylesheet for HTML export.', error);
+
+      if (href.startsWith('file:') && typeof XMLHttpRequest !== 'undefined') {
+        try {
+          const text = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', href, true);
+            xhr.responseType = 'text';
+            xhr.onload = () => {
+              if (xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300)) {
+                resolve(xhr.responseText);
+              } else {
+                reject(
+                  new Error(
+                    `XHR request failed with status ${xhr.status || '0'} for ${href}`
+                  )
+                );
+              }
+            };
+            xhr.onerror = () => {
+              reject(new Error(`XHR request encountered a network error for ${href}`));
+            };
+            xhr.send();
+          });
+
+          if (typeof text === 'string') {
+            return text;
+          }
+        } catch (xhrError) {
+          console.warn('[Export] XHR fallback failed to read stylesheet.', xhrError);
+        }
+      }
+
       return '';
     }
   }
