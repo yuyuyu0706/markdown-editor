@@ -57,6 +57,47 @@ function startApp() {
     }
   }
 
+  function triggerDownloadFromBlob(blob, filename) {
+    if (!(blob instanceof Blob)) {
+      throw new TypeError('A Blob instance is required to download content.');
+    }
+
+    const globalWindow = typeof window !== 'undefined' ? window : undefined;
+    const urlApi =
+      (globalWindow && (globalWindow.URL || globalWindow.webkitURL)) ||
+      (typeof URL !== 'undefined' ? URL : undefined);
+    if (!urlApi || typeof urlApi.createObjectURL !== 'function') {
+      throw new Error('URL.createObjectURL is not supported in this environment.');
+    }
+
+    const safeName = typeof filename === 'string' && filename.trim()
+      ? filename.trim()
+      : 'download';
+
+    const downloadUrl = urlApi.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = safeName;
+    anchor.style.display = 'none';
+
+    const parent = document.body || document.documentElement;
+    parent.appendChild(anchor);
+
+    const triggerClick = () => {
+      anchor.click();
+      parent.removeChild(anchor);
+      setTimeout(() => {
+        urlApi.revokeObjectURL(downloadUrl);
+      }, 0);
+    };
+
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(triggerClick);
+    } else {
+      setTimeout(triggerClick, 0);
+    }
+  }
+
   const templates = [
     { key: 'templates.meetingNotes', path: 'template/meeting-notes.md' },
     { key: 'templates.systemChangeOverview', path: 'template/system-change-overview.md' },
@@ -1229,31 +1270,38 @@ function startApp() {
 
   if (exportHtmlBtn) {
     exportHtmlBtn.addEventListener('click', () => {
-      const previewTitle = i18n.t('dialogs.previewTitle');
-      const langAttr =
-        document.documentElement.getAttribute('lang') || i18n.getCurrentLang();
-      const cssLink = document.querySelector('link[rel="stylesheet"]');
-      const cssHref = cssLink ? cssLink.href : '';
-      const linkTag = cssHref
-        ? `<link rel="stylesheet" href="${cssHref}">`
-        : '';
-      const html =
-        `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${linkTag}</head><body>${preview.innerHTML}</body></html>`;
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const defaultName = i18n.t('dialogs.defaultHtmlFileName');
-      const trimmedName =
-        typeof defaultName === 'string' && defaultName.trim()
-          ? defaultName.trim()
-          : 'preview.html';
-      const filename = trimmedName.endsWith('.html')
-        ? trimmedName
-        : `${trimmedName}.html`;
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      try {
+        if (!preview) {
+          throw new Error('Preview element is not available.');
+        }
+
+        const previewTitle = i18n.t('dialogs.previewTitle');
+        const langAttr =
+          document.documentElement.getAttribute('lang') || i18n.getCurrentLang();
+        const cssLink = document.querySelector('link[rel="stylesheet"]');
+        const cssHref = cssLink ? cssLink.href : '';
+        const linkTag = cssHref
+          ? `<link rel="stylesheet" href="${cssHref}">`
+          : '';
+        const html =
+          `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${linkTag}</head><body>${preview.innerHTML}</body></html>`;
+
+        const defaultName = i18n.t('dialogs.defaultHtmlFileName');
+        const trimmedName =
+          typeof defaultName === 'string' && defaultName.trim()
+            ? defaultName.trim()
+            : 'preview.html';
+        const filename = trimmedName.endsWith('.html')
+          ? trimmedName
+          : `${trimmedName}.html`;
+
+        triggerDownloadFromBlob(
+          new Blob([html], { type: 'text/html;charset=utf-8' }),
+          filename
+        );
+      } catch (error) {
+        console.error('[Export] Failed to download preview HTML.', error);
+      }
     });
   }
 
@@ -1265,13 +1313,14 @@ function startApp() {
         : 'document.md';
     const filename = trimmedName.endsWith('.md') ? trimmedName : `${trimmedName}.md`;
 
-    const blob = new Blob([AppState.getText()], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      triggerDownloadFromBlob(
+        new Blob([AppState.getText()], { type: 'text/markdown;charset=utf-8' }),
+        filename
+      );
+    } catch (error) {
+      console.error('[Export] Failed to download Markdown file.', error);
+    }
   });
 
   helpBtn.addEventListener('click', () => {

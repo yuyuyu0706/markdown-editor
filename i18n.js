@@ -11,6 +11,7 @@
         open: '📂 Open',
         save: '💾 Save',
         exportPdf: '📄 Export PDF',
+        exportHtml: '🌐 Export HTML',
         insertImage: '🖼 Insert Image',
         template: '📋 Templates',
         help: '❔ Help',
@@ -40,6 +41,7 @@
           'Failed to load the template. Please make sure the template files are available.',
         saveFilenamePrompt: 'Enter a file name to save',
         defaultFileName: 'document.md',
+        defaultHtmlFileName: 'preview.html',
         previewTitle: 'Preview'
       },
       editor: {
@@ -71,6 +73,7 @@
         open: '📂 開く',
         save: '💾 保存',
         exportPdf: '📄 PDF出力',
+        exportHtml: '🌐 HTML出力',
         insertImage: '🖼 画像を挿入',
         template: '📋 テンプレート',
         help: '❔ ヘルプ',
@@ -100,6 +103,7 @@
           'テンプレートの読み込みに失敗しました。テンプレートファイルの配置を確認してください。',
         saveFilenamePrompt: '保存するファイル名を入力してください',
         defaultFileName: 'document.md',
+        defaultHtmlFileName: 'preview.html',
         previewTitle: 'プレビュー'
       },
       editor: {
