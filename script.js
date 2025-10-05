@@ -1325,8 +1325,9 @@ function startApp() {
         } else if (cssHref) {
           headStyles = `<link rel="stylesheet" href="${cssHref}">`;
         }
+        const bodyContent = `<div id="preview" class="export-preview">${preview.innerHTML}</div>`;
         const html =
-          `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${headStyles}</head><body>${preview.innerHTML}</body></html>`;
+          `<!DOCTYPE html><html lang="${langAttr}"><head><meta charset="UTF-8"><title>${previewTitle}</title>${headStyles}</head><body>${bodyContent}</body></html>`;
 
         const defaultName = i18n.t('dialogs.defaultHtmlFileName');
         const trimmedName =
