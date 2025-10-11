@@ -1268,10 +1268,84 @@ function startApp() {
     });
   }
 
+  const EXPORT_STYLESHEET_FALLBACK = String.raw`
+body {
+  margin: 0;
+  font-family: 'Helvetica Neue', sans-serif;
+  background-color: #f6faff;
+  color: #002244;
+}
+
+#preview {
+  padding: 1rem;
+  box-sizing: border-box;
+  background-color: #f6faff;
+  color: #002244;
+}
+
+#preview img,
+#preview .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid .label foreignObject > div {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+#preview h1,
+#preview h2,
+#preview h3,
+#preview h4,
+#preview h5 {
+  border-bottom: 1px solid #aac8ff;
+  color: #0055aa;
+}
+
+pre {
+  background: #dfefff;
+  padding: 0.5rem;
+  overflow-x: auto;
+  border-left: 4px solid #88b4ff;
+}
+
+code {
+  background: #cce0ff;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  color: #003366;
+}
+
+pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+a {
+  color: #0077cc;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+@media print {
+  pre {
+    white-space: pre-wrap;
+    overflow-x: visible;
+  }
+}
+`;
+
   async function getInlineStylesheetContent() {
     const link = document.querySelector('link[rel="stylesheet"]');
     if (!link) {
-      return '';
+      return EXPORT_STYLESHEET_FALLBACK;
     }
 
     const { sheet } = link;
@@ -1290,12 +1364,12 @@ function startApp() {
 
     const href = typeof link.href === 'string' ? link.href : '';
     if (!href) {
-      return '';
+      return EXPORT_STYLESHEET_FALLBACK;
     }
 
     const fetchStylesheet = async () => {
       if (typeof fetch !== 'function') {
-        return '';
+        return EXPORT_STYLESHEET_FALLBACK;
       }
 
       const response = await fetch(href, { cache: 'no-store' });
@@ -1307,7 +1381,10 @@ function startApp() {
     };
 
     try {
-      return await fetchStylesheet();
+      const text = await fetchStylesheet();
+      if (text) {
+        return text;
+      }
     } catch (error) {
       console.warn('[Export] Failed to fetch stylesheet for HTML export.', error);
 
@@ -1342,8 +1419,16 @@ function startApp() {
         }
       }
 
-      return '';
+      console.info('[Export] Falling back to bundled preview styles for HTML export.');
+      return EXPORT_STYLESHEET_FALLBACK;
     }
+
+    if (href.startsWith('file:')) {
+      console.info('[Export] Using bundled preview styles for file protocol HTML export.');
+      return EXPORT_STYLESHEET_FALLBACK;
+    }
+
+    return '';
   }
 
   if (exportHtmlBtn) {
