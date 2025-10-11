@@ -6,6 +6,7 @@
     "open": "📂 Open",
     "save": "💾 Save",
     "exportPdf": "📄 Export PDF",
+    "exportHtml": "🌐 Export HTML",
     "insertImage": "🖼 Insert Image",
     "template": "📋 Templates",
     "help": "❔ Help",
@@ -33,6 +34,7 @@
     "templateLoadErrorAlert": "Failed to load the template. Please make sure the template files are available.",
     "saveFilenamePrompt": "Enter a file name to save",
     "defaultFileName": "document.md",
+    "defaultHtmlFileName": "preview.html",
     "previewTitle": "Preview"
   },
   "editor": {

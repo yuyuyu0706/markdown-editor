@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs/promises');
+const os = require('os');
 const path = require('path');
 
 const fileUrl = 'file://' + path.resolve(__dirname, '../index.html');
@@ -159,6 +161,24 @@ test('exports PDF via button', async ({ page }) => {
   await expect(popup).toHaveTitle('Preview');
   await popup.close();
   expect(popup.isClosed()).toBeTruthy();
+});
+
+test('exports preview HTML via button', async ({ page }) => {
+  await page.goto(fileUrl);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#export-html'),
+  ]);
+  const suggestedFilename = await download.suggestedFilename();
+  expect(suggestedFilename).toMatch(/\.html$/);
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'md-html-'));
+  const targetPath = path.join(tempDir, suggestedFilename);
+  await download.saveAs(targetPath);
+  const html = await fs.readFile(targetPath, 'utf8');
+  expect(html).toContain('<!DOCTYPE html>');
+  expect(html).toContain('Welcome to Markdown Editor Blue');
+  expect(html).toContain('<div id="preview"');
+  expect(html).toMatch(/<style>[\s\S]*pre \{/);
 });
 
 test('inserts image into preview', async ({ page }) => {

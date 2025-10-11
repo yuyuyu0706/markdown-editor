@@ -50,6 +50,7 @@ markdown-editor/
 | Toggle checkboxes in the preview | The matching task item in the Markdown source is toggled. |
 | Choose a template | Replace the current document with a starter outline from `template/`. |
 | Open / Save / Export PDF | Load Markdown from disk, download your work, or print the preview to PDF. |
+| Export preview HTML | Download the rendered preview as a standalone HTML file. |
 | Toggle the help window | Show or hide quick reference sheets for Markdown and Mermaid syntax. |
 
 ### Image placeholder example
