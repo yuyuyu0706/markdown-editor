@@ -1268,7 +1268,7 @@ function startApp() {
     });
   }
 
-  const EXPORT_STYLESHEET_FALLBACK = String.raw`
+const EXPORT_STYLESHEET_FALLBACK = String.raw`
 body {
   margin: 0;
   font-family: 'Helvetica Neue', sans-serif;
@@ -1279,7 +1279,7 @@ body {
 #preview {
   padding: 1rem;
   box-sizing: border-box;
-  background-color: #f6faff;
+  background-color: #ffffff;
   color: #002244;
 }
 
