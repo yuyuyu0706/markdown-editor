@@ -583,6 +583,7 @@ function startApp() {
 
   let formattingMenuElement = null;
   let formattingBoldButton = null;
+  let formattingExternalLinkButton = null;
   let formattingCopyButton = null;
   let formattingCutButton = null;
   let formattingPasteButton = null;
@@ -739,6 +740,15 @@ function startApp() {
       }
     }
 
+    if (formattingExternalLinkButton) {
+      if (formattingExternalLinkButton.disabled) {
+        formattingExternalLinkButton.disabled = false;
+      }
+      if (formattingExternalLinkButton.getAttribute('aria-disabled') !== null) {
+        formattingExternalLinkButton.removeAttribute('aria-disabled');
+      }
+    }
+
     const hasSelection = getEditorSelectionLength() > 0;
 
     if (formattingCopyButton) {
@@ -822,6 +832,60 @@ function startApp() {
     formattingMenuElement.style.visibility = 'visible';
     formattingMenuElement.setAttribute('aria-hidden', 'false');
     formattingMenuVisible = true;
+  }
+
+  function applyExternalLinkFormatting() {
+    if (!editor) {
+      return;
+    }
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    if (typeof start !== 'number' || typeof end !== 'number') {
+      return;
+    }
+
+    const selectionStart = Math.min(start, end);
+    const selectionEnd = Math.max(start, end);
+    const previousValue = editor.value || '';
+    const selectedText = previousValue.slice(selectionStart, selectionEnd);
+    const prevScrollTop = editor.scrollTop;
+
+    let nextValue = previousValue;
+    let nextSelectionStart = selectionStart;
+    let nextSelectionEnd = selectionEnd;
+
+    if (selectionStart === selectionEnd) {
+      const insertion = '[]()';
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        insertion +
+        previousValue.slice(selectionEnd);
+      nextSelectionStart = selectionStart + 1;
+      nextSelectionEnd = nextSelectionStart;
+    } else {
+      const wrapped = `[${selectedText}]()`;
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        wrapped +
+        previousValue.slice(selectionEnd);
+      nextSelectionStart = selectionStart + selectedText.length + 3;
+      nextSelectionEnd = nextSelectionStart;
+    }
+
+    editor.value = nextValue;
+    editor.scrollTop = prevScrollTop;
+    editor.selectionStart = nextSelectionStart;
+    editor.selectionEnd = nextSelectionEnd;
+
+    AppState.setText(nextValue, 'editor');
+    updateLineNumbers();
+
+    try {
+      editor.focus({ preventScroll: true });
+    } catch (error) {
+      editor.focus();
+    }
   }
 
   function applyBoldFormatting() {
@@ -1117,6 +1181,18 @@ function startApp() {
       hideFormattingMenu();
     });
 
+    const externalLinkButton = document.createElement('button');
+    externalLinkButton.type = 'button';
+    externalLinkButton.className = 'formatting-menu-button';
+    externalLinkButton.dataset.action = 'external-link';
+    externalLinkButton.dataset.i18n = 'formatting.externalLink';
+    externalLinkButton.setAttribute('role', 'menuitem');
+    externalLinkButton.textContent = i18n.t('formatting.externalLink');
+    externalLinkButton.addEventListener('click', () => {
+      applyExternalLinkFormatting();
+      hideFormattingMenu();
+    });
+
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
     copyButton.className = 'formatting-menu-button';
@@ -1155,6 +1231,7 @@ function startApp() {
     });
 
     menu.appendChild(boldButton);
+    menu.appendChild(externalLinkButton);
     menu.appendChild(copyButton);
     menu.appendChild(cutButton);
     menu.appendChild(pasteButton);
@@ -1163,6 +1240,7 @@ function startApp() {
 
     formattingMenuElement = menu;
     formattingBoldButton = boldButton;
+    formattingExternalLinkButton = externalLinkButton;
     formattingCopyButton = copyButton;
     formattingCutButton = cutButton;
     formattingPasteButton = pasteButton;

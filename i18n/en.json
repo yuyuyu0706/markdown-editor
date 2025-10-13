@@ -49,6 +49,7 @@
   },
   "formatting": {
     "bold": "𝐁 Bold",
+    "externalLink": "🔗 Add External Link",
     "copy": "📋 Copy",
     "cut": "✂️ Cut",
     "paste": "📥 Paste"
