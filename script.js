@@ -583,6 +583,7 @@ function startApp() {
 
   let formattingMenuElement = null;
   let formattingBoldButton = null;
+  let formattingCopyButton = null;
   let formattingMenuVisible = false;
 
   function getEditorSelectionLength() {
@@ -593,14 +594,23 @@ function startApp() {
   }
 
   function updateFormattingMenuState() {
-    if (!formattingBoldButton) {
-      return;
+    if (formattingBoldButton) {
+      if (formattingBoldButton.disabled) {
+        formattingBoldButton.disabled = false;
+      }
+      if (formattingBoldButton.getAttribute('aria-disabled') !== null) {
+        formattingBoldButton.removeAttribute('aria-disabled');
+      }
     }
-    if (formattingBoldButton.disabled) {
-      formattingBoldButton.disabled = false;
-    }
-    if (formattingBoldButton.getAttribute('aria-disabled') !== null) {
-      formattingBoldButton.removeAttribute('aria-disabled');
+
+    if (formattingCopyButton) {
+      const hasSelection = getEditorSelectionLength() > 0;
+      formattingCopyButton.disabled = !hasSelection;
+      if (hasSelection) {
+        formattingCopyButton.removeAttribute('aria-disabled');
+      } else {
+        formattingCopyButton.setAttribute('aria-disabled', 'true');
+      }
     }
   }
 
@@ -728,6 +738,60 @@ function startApp() {
     }
   }
 
+  function copyEditorSelection() {
+    if (!editor) {
+      return;
+    }
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    if (typeof start !== 'number' || typeof end !== 'number') {
+      return;
+    }
+
+    const selectionStart = Math.min(start, end);
+    const selectionEnd = Math.max(start, end);
+    if (selectionStart === selectionEnd) {
+      return;
+    }
+
+    const selectedText = (editor.value || '').slice(selectionStart, selectionEnd);
+    if (!selectedText) {
+      return;
+    }
+
+    const attemptExecCommandCopy = () => {
+      const activeElement = document.activeElement;
+      try {
+        try {
+          editor.focus({ preventScroll: true });
+        } catch (focusError) {
+          editor.focus();
+        }
+        document.execCommand('copy');
+      } catch (error) {
+        // Ignore copy errors to avoid interrupting the user experience.
+      } finally {
+        if (
+          activeElement &&
+          activeElement !== editor &&
+          typeof activeElement.focus === 'function'
+        ) {
+          activeElement.focus();
+        }
+      }
+    };
+
+    const clipboard =
+      typeof navigator !== 'undefined' && navigator ? navigator.clipboard : undefined;
+
+    if (clipboard && typeof clipboard.writeText === 'function') {
+      clipboard.writeText(selectedText).catch(attemptExecCommandCopy);
+    } else {
+      attemptExecCommandCopy();
+    }
+  }
+
   function handleEditorContextMenu(event) {
     if (!editor) {
       return;
@@ -808,12 +872,26 @@ function startApp() {
       hideFormattingMenu();
     });
 
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'formatting-menu-button';
+    copyButton.dataset.action = 'copy';
+    copyButton.dataset.i18n = 'formatting.copy';
+    copyButton.setAttribute('role', 'menuitem');
+    copyButton.textContent = i18n.t('formatting.copy');
+    copyButton.addEventListener('click', () => {
+      copyEditorSelection();
+      hideFormattingMenu();
+    });
+
     menu.appendChild(boldButton);
+    menu.appendChild(copyButton);
     document.body.appendChild(menu);
     i18n.applyToDOM(menu);
 
     formattingMenuElement = menu;
     formattingBoldButton = boldButton;
+    formattingCopyButton = copyButton;
 
     updateFormattingMenuState();
 
