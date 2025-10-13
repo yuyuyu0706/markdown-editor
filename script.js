@@ -584,7 +584,142 @@ function startApp() {
   let formattingMenuElement = null;
   let formattingBoldButton = null;
   let formattingCopyButton = null;
+  let formattingPasteButton = null;
+  let clipboardReadSupported = false;
+  let clipboardHasText = false;
+  let clipboardReadRequestId = 0;
   let formattingMenuVisible = false;
+
+  function getNavigatorClipboard() {
+    if (typeof navigator === 'undefined' || !navigator) {
+      return null;
+    }
+    return navigator.clipboard || null;
+  }
+
+  function updateClipboardButtonStates() {
+    const button = formattingPasteButton;
+    const enabled = clipboardReadSupported && clipboardHasText;
+    if (!button) {
+      return;
+    }
+    button.disabled = !enabled;
+    if (enabled) {
+      button.removeAttribute('aria-disabled');
+    } else {
+      button.setAttribute('aria-disabled', 'true');
+    }
+  }
+
+  function refreshClipboardState() {
+    const clipboard = getNavigatorClipboard();
+    const canRead = Boolean(clipboard && typeof clipboard.readText === 'function');
+    clipboardReadSupported = canRead;
+    clipboardHasText = false;
+    updateClipboardButtonStates();
+
+    if (!canRead) {
+      return;
+    }
+
+    const requestId = ++clipboardReadRequestId;
+    clipboard
+      .readText()
+      .then(text => {
+        if (requestId !== clipboardReadRequestId) {
+          return;
+        }
+        clipboardHasText = typeof text === 'string' && text.length > 0;
+        updateClipboardButtonStates();
+      })
+      .catch(error => {
+        if (requestId !== clipboardReadRequestId) {
+          return;
+        }
+        clipboardHasText = false;
+        if (error && error.name === 'NotAllowedError') {
+          clipboardReadSupported = false;
+        }
+        updateClipboardButtonStates();
+      });
+  }
+
+  async function readClipboardText() {
+    const clipboard = getNavigatorClipboard();
+    if (!clipboard || typeof clipboard.readText !== 'function') {
+      clipboardReadSupported = false;
+      clipboardHasText = false;
+      updateClipboardButtonStates();
+      return '';
+    }
+
+    try {
+      const text = await clipboard.readText();
+      clipboardReadSupported = true;
+      clipboardHasText = typeof text === 'string' && text.length > 0;
+      updateClipboardButtonStates();
+      return typeof text === 'string' ? text : '';
+    } catch (error) {
+      clipboardHasText = false;
+      if (error && error.name === 'NotAllowedError') {
+        clipboardReadSupported = false;
+      }
+      updateClipboardButtonStates();
+      return '';
+    }
+  }
+
+  function insertTextAtCursor(text) {
+    if (!editor || typeof text !== 'string') {
+      return;
+    }
+
+    const value = editor.value || '';
+    const start = Math.min(editor.selectionStart || 0, editor.selectionEnd || 0);
+    const end = Math.max(editor.selectionStart || 0, editor.selectionEnd || 0);
+    const previousScrollTop = editor.scrollTop;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const nextValue = `${before}${text}${after}`;
+    const nextCaret = before.length + text.length;
+
+    editor.value = nextValue;
+    editor.scrollTop = previousScrollTop;
+    editor.selectionStart = nextCaret;
+    editor.selectionEnd = nextCaret;
+
+    AppState.setText(nextValue, 'editor');
+    updateLineNumbers();
+
+    try {
+      editor.focus({ preventScroll: true });
+    } catch (error) {
+      editor.focus();
+    }
+  }
+
+  function normalizePlainTextValue(text) {
+    if (typeof text !== 'string') {
+      return '';
+    }
+    return text.replace(/\r\n?/g, '\n');
+  }
+
+  async function pasteClipboardText() {
+    if (!editor) {
+      return;
+    }
+
+    const clipboardText = await readClipboardText();
+    if (!clipboardText) {
+      return;
+    }
+
+    const textToInsert = normalizePlainTextValue(clipboardText);
+
+    insertTextAtCursor(textToInsert);
+    hideFormattingMenu();
+  }
 
   function getEditorSelectionLength() {
     if (!editor) {
@@ -612,6 +747,8 @@ function startApp() {
         formattingCopyButton.setAttribute('aria-disabled', 'true');
       }
     }
+
+    updateClipboardButtonStates();
   }
 
   function hideFormattingMenu() {
@@ -631,6 +768,7 @@ function startApp() {
       return;
     }
 
+    refreshClipboardState();
     updateFormattingMenuState();
 
     const scrollX = window.pageXOffset || window.scrollX || 0;
@@ -786,7 +924,16 @@ function startApp() {
       typeof navigator !== 'undefined' && navigator ? navigator.clipboard : undefined;
 
     if (clipboard && typeof clipboard.writeText === 'function') {
-      clipboard.writeText(selectedText).catch(attemptExecCommandCopy);
+      clipboard
+        .writeText(selectedText)
+        .then(() => {
+          if (clipboard && typeof clipboard.readText === 'function') {
+            clipboardReadSupported = true;
+            clipboardHasText = true;
+            updateClipboardButtonStates();
+          }
+        })
+        .catch(attemptExecCommandCopy);
     } else {
       attemptExecCommandCopy();
     }
@@ -806,9 +953,7 @@ function startApp() {
     }
     if (getEditorSelectionLength() === 0) {
       hideFormattingMenu();
-      return;
     }
-    showFormattingMenu(event.clientX, event.clientY);
   }
 
   function handleEditorSelect() {
@@ -884,14 +1029,29 @@ function startApp() {
       hideFormattingMenu();
     });
 
+    const pasteButton = document.createElement('button');
+    pasteButton.type = 'button';
+    pasteButton.className = 'formatting-menu-button';
+    pasteButton.dataset.action = 'paste';
+    pasteButton.dataset.i18n = 'formatting.paste';
+    pasteButton.setAttribute('role', 'menuitem');
+    pasteButton.textContent = i18n.t('formatting.paste');
+    pasteButton.disabled = true;
+    pasteButton.setAttribute('aria-disabled', 'true');
+    pasteButton.addEventListener('click', () => {
+      pasteClipboardText();
+    });
+
     menu.appendChild(boldButton);
     menu.appendChild(copyButton);
+    menu.appendChild(pasteButton);
     document.body.appendChild(menu);
     i18n.applyToDOM(menu);
 
     formattingMenuElement = menu;
     formattingBoldButton = boldButton;
     formattingCopyButton = copyButton;
+    formattingPasteButton = pasteButton;
 
     updateFormattingMenuState();
 
