@@ -59,8 +59,7 @@
       formatting: {
         bold: '𝐁 Bold',
         copy: '📋 Copy',
-        paste: '📥 Paste',
-        pastePlain: '📝 Paste as Plain Text'
+        paste: '📥 Paste'
       },
       image: {
         fallback: '[Image: {filename}]',
@@ -124,8 +123,7 @@
       formatting: {
         bold: '太字',
         copy: '📋 コピー',
-        paste: '📥 ペースト',
-        pastePlain: '📝 プレーンテキストとしてペースト'
+        paste: '📥 ペースト'
       },
       image: {
         fallback: '[画像: {filename}]',

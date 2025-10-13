@@ -50,8 +50,7 @@
   "formatting": {
     "bold": "𝐁 Bold",
     "copy": "📋 Copy",
-    "paste": "📥 Paste",
-    "pastePlain": "📝 Paste as Plain Text"
+    "paste": "📥 Paste"
   },
   "image": {
     "fallback": "[Image: {filename}]",

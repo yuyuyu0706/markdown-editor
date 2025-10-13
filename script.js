@@ -585,7 +585,6 @@ function startApp() {
   let formattingBoldButton = null;
   let formattingCopyButton = null;
   let formattingPasteButton = null;
-  let formattingPastePlainButton = null;
   let clipboardReadSupported = false;
   let clipboardHasText = false;
   let clipboardReadRequestId = 0;
@@ -599,19 +598,17 @@ function startApp() {
   }
 
   function updateClipboardButtonStates() {
-    const buttons = [formattingPasteButton, formattingPastePlainButton];
+    const button = formattingPasteButton;
     const enabled = clipboardReadSupported && clipboardHasText;
-    buttons.forEach(button => {
-      if (!button) {
-        return;
-      }
-      button.disabled = !enabled;
-      if (enabled) {
-        button.removeAttribute('aria-disabled');
-      } else {
-        button.setAttribute('aria-disabled', 'true');
-      }
-    });
+    if (!button) {
+      return;
+    }
+    button.disabled = !enabled;
+    if (enabled) {
+      button.removeAttribute('aria-disabled');
+    } else {
+      button.setAttribute('aria-disabled', 'true');
+    }
   }
 
   function refreshClipboardState() {
@@ -708,7 +705,7 @@ function startApp() {
     return text.replace(/\r\n?/g, '\n');
   }
 
-  async function pasteClipboardText(options = {}) {
+  async function pasteClipboardText() {
     if (!editor) {
       return;
     }
@@ -718,10 +715,7 @@ function startApp() {
       return;
     }
 
-    const usePlainText = Boolean(options.plainText);
-    const textToInsert = usePlainText
-      ? normalizePlainTextValue(clipboardText)
-      : clipboardText;
+    const textToInsert = normalizePlainTextValue(clipboardText);
 
     insertTextAtCursor(textToInsert);
     hideFormattingMenu();
@@ -1047,26 +1041,12 @@ function startApp() {
     pasteButton.disabled = true;
     pasteButton.setAttribute('aria-disabled', 'true');
     pasteButton.addEventListener('click', () => {
-      pasteClipboardText({ plainText: false });
-    });
-
-    const pastePlainButton = document.createElement('button');
-    pastePlainButton.type = 'button';
-    pastePlainButton.className = 'formatting-menu-button';
-    pastePlainButton.dataset.action = 'pastePlain';
-    pastePlainButton.dataset.i18n = 'formatting.pastePlain';
-    pastePlainButton.setAttribute('role', 'menuitem');
-    pastePlainButton.textContent = i18n.t('formatting.pastePlain');
-    pastePlainButton.disabled = true;
-    pastePlainButton.setAttribute('aria-disabled', 'true');
-    pastePlainButton.addEventListener('click', () => {
-      pasteClipboardText({ plainText: true });
+      pasteClipboardText();
     });
 
     menu.appendChild(boldButton);
     menu.appendChild(copyButton);
     menu.appendChild(pasteButton);
-    menu.appendChild(pastePlainButton);
     document.body.appendChild(menu);
     i18n.applyToDOM(menu);
 
@@ -1074,7 +1054,6 @@ function startApp() {
     formattingBoldButton = boldButton;
     formattingCopyButton = copyButton;
     formattingPasteButton = pasteButton;
-    formattingPastePlainButton = pastePlainButton;
 
     updateFormattingMenuState();
 
