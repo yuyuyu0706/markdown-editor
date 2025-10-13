@@ -50,6 +50,7 @@
   "formatting": {
     "bold": "𝐁 Bold",
     "copy": "📋 Copy",
+    "cut": "✂️ Cut",
     "paste": "📥 Paste"
   },
   "image": {

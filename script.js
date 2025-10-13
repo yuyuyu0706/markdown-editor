@@ -584,6 +584,7 @@ function startApp() {
   let formattingMenuElement = null;
   let formattingBoldButton = null;
   let formattingCopyButton = null;
+  let formattingCutButton = null;
   let formattingPasteButton = null;
   let clipboardReadSupported = false;
   let clipboardHasText = false;
@@ -738,13 +739,23 @@ function startApp() {
       }
     }
 
+    const hasSelection = getEditorSelectionLength() > 0;
+
     if (formattingCopyButton) {
-      const hasSelection = getEditorSelectionLength() > 0;
       formattingCopyButton.disabled = !hasSelection;
       if (hasSelection) {
         formattingCopyButton.removeAttribute('aria-disabled');
       } else {
         formattingCopyButton.setAttribute('aria-disabled', 'true');
+      }
+    }
+
+    if (formattingCutButton) {
+      formattingCutButton.disabled = !hasSelection;
+      if (hasSelection) {
+        formattingCutButton.removeAttribute('aria-disabled');
+      } else {
+        formattingCutButton.setAttribute('aria-disabled', 'true');
       }
     }
 
@@ -939,6 +950,95 @@ function startApp() {
     }
   }
 
+  function cutEditorSelection() {
+    if (!editor) {
+      return;
+    }
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    if (typeof start !== 'number' || typeof end !== 'number') {
+      return;
+    }
+
+    const selectionStart = Math.min(start, end);
+    const selectionEnd = Math.max(start, end);
+    if (selectionStart === selectionEnd) {
+      return;
+    }
+
+    const selectedText = (editor.value || '').slice(selectionStart, selectionEnd);
+    if (!selectedText) {
+      return;
+    }
+
+    const removeSelection = () => {
+      const value = editor.value || '';
+      const before = value.slice(0, selectionStart);
+      const after = value.slice(selectionEnd);
+      const nextValue = `${before}${after}`;
+      const nextCaret = before.length;
+
+      editor.value = nextValue;
+      editor.selectionStart = nextCaret;
+      editor.selectionEnd = nextCaret;
+
+      AppState.setText(nextValue, 'editor');
+      updateLineNumbers();
+
+      try {
+        editor.focus({ preventScroll: true });
+      } catch (error) {
+        editor.focus();
+      }
+    };
+
+    const attemptExecCommandCopy = () => {
+      const activeElement = document.activeElement;
+      try {
+        try {
+          editor.focus({ preventScroll: true });
+        } catch (focusError) {
+          editor.focus();
+        }
+        document.execCommand('copy');
+      } catch (error) {
+        // Ignore copy errors to avoid interrupting the user experience.
+      } finally {
+        if (
+          activeElement &&
+          activeElement !== editor &&
+          typeof activeElement.focus === 'function'
+        ) {
+          activeElement.focus();
+        }
+      }
+    };
+
+    const clipboard =
+      typeof navigator !== 'undefined' && navigator ? navigator.clipboard : undefined;
+
+    if (clipboard && typeof clipboard.writeText === 'function') {
+      clipboard
+        .writeText(selectedText)
+        .then(() => {
+          if (clipboard && typeof clipboard.readText === 'function') {
+            clipboardReadSupported = true;
+            clipboardHasText = true;
+            updateClipboardButtonStates();
+          }
+          removeSelection();
+        })
+        .catch(() => {
+          attemptExecCommandCopy();
+          removeSelection();
+        });
+    } else {
+      attemptExecCommandCopy();
+      removeSelection();
+    }
+  }
+
   function handleEditorContextMenu(event) {
     if (!editor) {
       return;
@@ -1029,6 +1129,18 @@ function startApp() {
       hideFormattingMenu();
     });
 
+    const cutButton = document.createElement('button');
+    cutButton.type = 'button';
+    cutButton.className = 'formatting-menu-button';
+    cutButton.dataset.action = 'cut';
+    cutButton.dataset.i18n = 'formatting.cut';
+    cutButton.setAttribute('role', 'menuitem');
+    cutButton.textContent = i18n.t('formatting.cut');
+    cutButton.addEventListener('click', () => {
+      cutEditorSelection();
+      hideFormattingMenu();
+    });
+
     const pasteButton = document.createElement('button');
     pasteButton.type = 'button';
     pasteButton.className = 'formatting-menu-button';
@@ -1044,6 +1156,7 @@ function startApp() {
 
     menu.appendChild(boldButton);
     menu.appendChild(copyButton);
+    menu.appendChild(cutButton);
     menu.appendChild(pasteButton);
     document.body.appendChild(menu);
     i18n.applyToDOM(menu);
@@ -1051,6 +1164,7 @@ function startApp() {
     formattingMenuElement = menu;
     formattingBoldButton = boldButton;
     formattingCopyButton = copyButton;
+    formattingCutButton = cutButton;
     formattingPasteButton = pasteButton;
 
     updateFormattingMenuState();
