@@ -953,9 +953,7 @@ function startApp() {
     }
     if (getEditorSelectionLength() === 0) {
       hideFormattingMenu();
-      return;
     }
-    showFormattingMenu(event.clientX, event.clientY);
   }
 
   function handleEditorSelect() {
