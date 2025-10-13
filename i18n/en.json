@@ -49,7 +49,9 @@
   },
   "formatting": {
     "bold": "𝐁 Bold",
-    "copy": "📋 Copy"
+    "copy": "📋 Copy",
+    "paste": "📥 Paste",
+    "pastePlain": "📝 Paste as Plain Text"
   },
   "image": {
     "fallback": "[Image: {filename}]",
