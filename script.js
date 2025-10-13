@@ -21,6 +21,7 @@ function startApp() {
   let lastHighlightMarkup = null;
   let highlightMetricsSyncHandle = null;
   let highlightMetricsSyncMethod = null;
+  let lastKnownEditorTextColor = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
@@ -142,6 +143,66 @@ function startApp() {
       .replace(/'/g, '&#39;');
   }
 
+  function isTransparentColor(value) {
+    if (!value) {
+      return false;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'transparent') {
+      return true;
+    }
+
+    const rgbaMatch = normalized.match(
+      /^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d*(?:\.\d+)?))?\s*\)$/
+    );
+    if (rgbaMatch) {
+      const alpha = rgbaMatch[4];
+      if (typeof alpha === 'string' && alpha.length > 0) {
+        return Number(alpha) === 0;
+      }
+      return false;
+    }
+
+    const hslaMatch = normalized.match(
+      /^hsla?\s*\(\s*(?:-?\d+(?:\.\d+)?(?:deg|rad|grad|turn)?)\s*,\s*\d+(?:\.\d+)?%\s*,\s*\d+(?:\.\d+)?%(?:\s*,\s*(\d*(?:\.\d+)?))?\s*\)$/
+    );
+    if (hslaMatch) {
+      const alpha = hslaMatch[1];
+      if (typeof alpha === 'string' && alpha.length > 0) {
+        return Number(alpha) === 0;
+      }
+      return false;
+    }
+
+    return false;
+  }
+
+  function resolveEditorTextColor(computed) {
+    const view =
+      editor && editor.ownerDocument && editor.ownerDocument.defaultView;
+
+    let colorValue = computed ? computed.getPropertyValue('color') : '';
+    if (!colorValue || isTransparentColor(colorValue)) {
+      if (!lastKnownEditorTextColor && editorContentContainer && view) {
+        const containerComputed = view.getComputedStyle(
+          editorContentContainer
+        );
+        const containerColor = containerComputed
+          ? containerComputed.getPropertyValue('color')
+          : '';
+        if (containerColor && !isTransparentColor(containerColor)) {
+          lastKnownEditorTextColor = containerColor;
+        }
+      }
+      colorValue = lastKnownEditorTextColor;
+    } else {
+      lastKnownEditorTextColor = colorValue;
+    }
+
+    return colorValue;
+  }
+
   function buildEditorHighlightMarkup(value) {
     const normalized = typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : '';
     if (!normalized) {
@@ -244,7 +305,7 @@ function startApp() {
       }
     });
 
-    const colorValue = computed.getPropertyValue('color');
+    const colorValue = resolveEditorTextColor(computed);
     if (colorValue) {
       highlightStyle.setProperty('color', colorValue);
       if (editorContentContainer) {
