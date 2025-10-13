@@ -19,9 +19,6 @@ function startApp() {
     editorHighlightElement &&
     editorHighlightElement.querySelector('.editor-highlight-content');
   let lastHighlightMarkup = null;
-  let highlightMetricsSyncHandle = null;
-  let highlightMetricsSyncMethod = null;
-  let lastKnownEditorTextColor = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
@@ -130,7 +127,6 @@ function startApp() {
       );
     }
 
-    scheduleEditorHighlightMetricsSync();
     return Boolean(editorHighlightContent);
   }
 
@@ -141,66 +137,6 @@ function startApp() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
-  }
-
-  function isTransparentColor(value) {
-    if (!value) {
-      return false;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'transparent') {
-      return true;
-    }
-
-    const rgbaMatch = normalized.match(
-      /^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d*(?:\.\d+)?))?\s*\)$/
-    );
-    if (rgbaMatch) {
-      const alpha = rgbaMatch[4];
-      if (typeof alpha === 'string' && alpha.length > 0) {
-        return Number(alpha) === 0;
-      }
-      return false;
-    }
-
-    const hslaMatch = normalized.match(
-      /^hsla?\s*\(\s*(?:-?\d+(?:\.\d+)?(?:deg|rad|grad|turn)?)\s*,\s*\d+(?:\.\d+)?%\s*,\s*\d+(?:\.\d+)?%(?:\s*,\s*(\d*(?:\.\d+)?))?\s*\)$/
-    );
-    if (hslaMatch) {
-      const alpha = hslaMatch[1];
-      if (typeof alpha === 'string' && alpha.length > 0) {
-        return Number(alpha) === 0;
-      }
-      return false;
-    }
-
-    return false;
-  }
-
-  function resolveEditorTextColor(computed) {
-    const view =
-      editor && editor.ownerDocument && editor.ownerDocument.defaultView;
-
-    let colorValue = computed ? computed.getPropertyValue('color') : '';
-    if (!colorValue || isTransparentColor(colorValue)) {
-      if (!lastKnownEditorTextColor && editorContentContainer && view) {
-        const containerComputed = view.getComputedStyle(
-          editorContentContainer
-        );
-        const containerColor = containerComputed
-          ? containerComputed.getPropertyValue('color')
-          : '';
-        if (containerColor && !isTransparentColor(containerColor)) {
-          lastKnownEditorTextColor = containerColor;
-        }
-      }
-      colorValue = lastKnownEditorTextColor;
-    } else {
-      lastKnownEditorTextColor = colorValue;
-    }
-
-    return colorValue;
   }
 
   function buildEditorHighlightMarkup(value) {
@@ -247,116 +183,6 @@ function startApp() {
     editorHighlightContent.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
   }
 
-  function syncEditorHighlightMetrics() {
-    if (!editor || !editorHighlightElement) {
-      return;
-    }
-    const doc = editor.ownerDocument;
-    const view = doc && doc.defaultView;
-    if (!view || typeof view.getComputedStyle !== 'function') {
-      return;
-    }
-    const computed = view.getComputedStyle(editor);
-    if (!computed) {
-      return;
-    }
-
-    const highlightStyle = editorHighlightElement.style;
-    const contentStyle = editorHighlightContent
-      ? editorHighlightContent.style
-      : null;
-
-    const metricsProps = [
-      'font-family',
-      'font-size',
-      'font-weight',
-      'font-style',
-      'font-variant',
-      'line-height',
-      'letter-spacing',
-      'text-transform',
-      'text-indent',
-      'text-align',
-      'word-spacing',
-      'white-space',
-      'tab-size'
-    ];
-
-    metricsProps.forEach(prop => {
-      const value = computed.getPropertyValue(prop);
-      if (value) {
-        highlightStyle.setProperty(prop, value);
-        if (contentStyle) {
-          contentStyle.setProperty(prop, value);
-        }
-      }
-    });
-
-    const paddingProps = [
-      'padding-top',
-      'padding-right',
-      'padding-bottom',
-      'padding-left'
-    ];
-    paddingProps.forEach(prop => {
-      const value = computed.getPropertyValue(prop);
-      if (value) {
-        highlightStyle.setProperty(prop, value);
-      }
-    });
-
-    const colorValue = resolveEditorTextColor(computed);
-    if (colorValue) {
-      highlightStyle.setProperty('color', colorValue);
-      if (editorContentContainer) {
-        editorContentContainer.style.setProperty(
-          '--editor-text-color',
-          colorValue
-        );
-      }
-    }
-
-    const backgroundValue = computed.getPropertyValue('background-color');
-    if (backgroundValue) {
-      highlightStyle.setProperty('background-color', backgroundValue);
-    }
-  }
-
-  function scheduleEditorHighlightMetricsSync() {
-    if (!editor) {
-      return;
-    }
-
-    const useRaf =
-      typeof requestAnimationFrame === 'function' &&
-      typeof cancelAnimationFrame === 'function';
-
-    if (highlightMetricsSyncHandle !== null) {
-      if (highlightMetricsSyncMethod === 'raf') {
-        cancelAnimationFrame(highlightMetricsSyncHandle);
-      } else {
-        clearTimeout(highlightMetricsSyncHandle);
-      }
-      highlightMetricsSyncHandle = null;
-      highlightMetricsSyncMethod = null;
-    }
-
-    const run = () => {
-      highlightMetricsSyncHandle = null;
-      highlightMetricsSyncMethod = null;
-      syncEditorHighlightMetrics();
-      syncEditorHighlightScroll();
-    };
-
-    if (useRaf) {
-      highlightMetricsSyncMethod = 'raf';
-      highlightMetricsSyncHandle = requestAnimationFrame(run);
-    } else {
-      highlightMetricsSyncMethod = 'timeout';
-      highlightMetricsSyncHandle = setTimeout(run, 0);
-    }
-  }
-
   function updateEditorHighlight(value) {
     if (!ensureEditorHighlightStructure()) {
       return;
@@ -370,25 +196,10 @@ function startApp() {
       editorContentContainer.classList.add('editor-highlight-enabled');
     }
     syncEditorHighlightScroll();
-    scheduleEditorHighlightMetricsSync();
   }
 
   ensureEditorHighlightStructure();
   updateEditorHighlight(editor ? editor.value : '');
-
-  if (
-    document.fonts &&
-    typeof document.fonts.addEventListener === 'function'
-  ) {
-    document.fonts.addEventListener(
-      'loadingdone',
-      scheduleEditorHighlightMetricsSync
-    );
-    document.fonts.addEventListener(
-      'loadingerror',
-      scheduleEditorHighlightMetricsSync
-    );
-  }
 
   function triggerDownloadFromBlob(blob, filename) {
     if (!(blob instanceof Blob)) {
@@ -823,7 +634,7 @@ function startApp() {
     if (editor) {
       editor.style.width = `${contentWidth}px`;
     }
-    scheduleEditorHighlightMetricsSync();
+    syncEditorHighlightScroll();
   };
 
   const clampEditorWidth = (width, totalAvailable) => {
@@ -1733,7 +1544,7 @@ function startApp() {
     if (storedEditorWidthRatio !== null && !isDraggingEditor) {
       applyEditorRatio(storedEditorWidthRatio);
     }
-    scheduleEditorHighlightMetricsSync();
+    syncEditorHighlightScroll();
   });
 
   // Update preview and expand stored Base64 images

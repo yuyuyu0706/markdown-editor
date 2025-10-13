@@ -180,7 +180,7 @@ main {
 #editor-content-container {
   position: relative;
   flex: 1;
-  display: flex;
+  display: grid;
   box-sizing: border-box;
   background-color: #ffffff;
   font-family: monospace;
@@ -205,6 +205,11 @@ main {
   color: inherit;
 }
 
+#editor-content-container textarea,
+#editor-highlight {
+  grid-area: 1 / 1 / 2 / 2;
+}
+
 #editor-content-container.editor-highlight-enabled textarea {
   background-color: transparent;
   color: transparent;
@@ -214,12 +219,13 @@ main {
 }
 
 #editor-highlight {
-  position: absolute;
-  inset: 0;
+  align-self: stretch;
+  justify-self: stretch;
   display: none;
   padding: 1rem;
   box-sizing: border-box;
   pointer-events: none;
+  background-color: inherit;
   color: inherit;
   font: inherit;
   line-height: inherit;
