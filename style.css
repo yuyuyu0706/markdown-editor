@@ -154,6 +154,7 @@ body {
   cursor: default;
   opacity: 0.6;
   background: transparent;
+  color: #7a7a7a;
 }
 
 .formatting-menu-button:disabled:hover,
