@@ -183,6 +183,11 @@ main {
   display: flex;
   box-sizing: border-box;
   background-color: #ffffff;
+  font-family: monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #003366;
+  --editor-text-color: #003366;
 }
 
 #editor-pane textarea {
@@ -193,18 +198,17 @@ main {
   box-sizing: border-box;
   border: none;
   resize: none;
-  font-size: 1rem;
-  line-height: 1.5;
+  font: inherit;
+  line-height: inherit;
   outline: none;
   background-color: #ffffff;
-  color: #003366;
-  font-family: monospace;
+  color: inherit;
 }
 
 #editor-content-container.editor-highlight-enabled textarea {
   background-color: transparent;
   color: transparent;
-  caret-color: #003366;
+  caret-color: var(--editor-text-color, #003366);
   position: relative;
   z-index: 2;
 }
@@ -216,12 +220,12 @@ main {
   padding: 1rem;
   box-sizing: border-box;
   pointer-events: none;
-  color: #003366;
-  font-family: monospace;
-  font-size: 1rem;
-  line-height: 1.5;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   overflow: hidden;
   z-index: 1;
 }
@@ -234,6 +238,7 @@ main {
   min-height: 100%;
   transform: translate(0, 0);
   will-change: transform;
+  white-space: inherit;
 }
 
 #editor-highlight .external-link-text {
