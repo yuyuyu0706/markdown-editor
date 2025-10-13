@@ -13,6 +13,13 @@ function startApp() {
   const editor = document.getElementById('editor');
   let editorPane = document.getElementById('editor-pane');
   let lineNumberGutter = document.getElementById('line-number-gutter');
+  let editorContentContainer = document.getElementById('editor-content-container');
+  let editorHighlightElement = document.getElementById('editor-highlight');
+  let editorHighlightContent =
+    editorHighlightElement &&
+    editorHighlightElement.querySelector('.editor-highlight-content');
+  let lastHighlightMarkup = null;
+  const HIGHLIGHT_PLACEHOLDER = '&#8203;';
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -56,6 +63,143 @@ function startApp() {
       editorPane.insertBefore(lineNumberGutter, editorPane.firstChild);
     }
   }
+
+  function ensureEditorHighlightStructure() {
+    if (!editor) {
+      return false;
+    }
+
+    if (!editorContentContainer || !editorContentContainer.isConnected) {
+      const existingContainer = document.getElementById('editor-content-container');
+      if (existingContainer) {
+        editorContentContainer = existingContainer;
+      } else {
+        const container = document.createElement('div');
+        container.id = 'editor-content-container';
+        container.className = 'editor-content-container';
+        editorContentContainer = container;
+      }
+    }
+
+    if (editorPane && editorContentContainer.parentElement !== editorPane) {
+      editorPane.appendChild(editorContentContainer);
+    }
+
+    if (editorContentContainer && !editorContentContainer.contains(editor)) {
+      editorContentContainer.appendChild(editor);
+    }
+
+    if (!editorHighlightElement || !editorHighlightElement.isConnected) {
+      const existingHighlight = document.getElementById('editor-highlight');
+      if (existingHighlight) {
+        editorHighlightElement = existingHighlight;
+      } else {
+        const highlight = document.createElement('div');
+        highlight.id = 'editor-highlight';
+        highlight.setAttribute('aria-hidden', 'true');
+        editorHighlightElement = highlight;
+      }
+    }
+
+    if (!editorHighlightContent || !editorHighlightElement.contains(editorHighlightContent)) {
+      let highlightContent =
+        editorHighlightElement.querySelector('.editor-highlight-content');
+      if (!highlightContent) {
+        highlightContent = document.createElement('div');
+        highlightContent.className = 'editor-highlight-content';
+        editorHighlightElement.innerHTML = '';
+        editorHighlightElement.appendChild(highlightContent);
+      }
+      editorHighlightContent = highlightContent;
+    }
+
+    if (
+      editorContentContainer &&
+      editorHighlightElement &&
+      !editorContentContainer.contains(editorHighlightElement)
+    ) {
+      if (editorHighlightElement.parentElement) {
+        editorHighlightElement.parentElement.removeChild(editorHighlightElement);
+      }
+      editorContentContainer.insertBefore(
+        editorHighlightElement,
+        editorContentContainer.firstChild
+      );
+    }
+
+    return Boolean(editorHighlightContent);
+  }
+
+  function escapeHighlightHtml(text) {
+    return (text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildEditorHighlightMarkup(value) {
+    const normalized = typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : '';
+    if (!normalized) {
+      return HIGHLIGHT_PLACEHOLDER;
+    }
+
+    const pattern = /\[([^\]]*?)\]\(([^)]*?)\)/g;
+    let result = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(normalized)) !== null) {
+      const startIndex = match.index;
+      const endIndex = pattern.lastIndex;
+      result += escapeHighlightHtml(normalized.slice(lastIndex, startIndex));
+
+      const isImageSyntax = startIndex > 0 && normalized.charAt(startIndex - 1) === '!';
+      if (isImageSyntax) {
+        result += escapeHighlightHtml(normalized.slice(startIndex, endIndex));
+      } else {
+        result += '[';
+        const linkText = match[1];
+        result += `<span class="external-link-text">${escapeHighlightHtml(linkText)}</span>`;
+        result += '](';
+        result += escapeHighlightHtml(match[2]);
+        result += ')';
+      }
+
+      lastIndex = endIndex;
+    }
+
+    result += escapeHighlightHtml(normalized.slice(lastIndex));
+    return result + HIGHLIGHT_PLACEHOLDER;
+  }
+
+  function syncEditorHighlightScroll() {
+    if (!editor || !editorHighlightContent) {
+      return;
+    }
+    const scrollTop = editor.scrollTop || 0;
+    const scrollLeft = editor.scrollLeft || 0;
+    editorHighlightContent.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
+  }
+
+  function updateEditorHighlight(value) {
+    if (!ensureEditorHighlightStructure()) {
+      return;
+    }
+    const markup = buildEditorHighlightMarkup(value);
+    if (markup !== lastHighlightMarkup) {
+      editorHighlightContent.innerHTML = markup;
+      lastHighlightMarkup = markup;
+    }
+    if (editorContentContainer) {
+      editorContentContainer.classList.add('editor-highlight-enabled');
+    }
+    syncEditorHighlightScroll();
+  }
+
+  ensureEditorHighlightStructure();
+  updateEditorHighlight(editor ? editor.value : '');
 
   function triggerDownloadFromBlob(blob, filename) {
     if (!(blob instanceof Blob)) {
@@ -155,6 +299,7 @@ function startApp() {
         editor.value = result;
         editor.selectionStart = editor.selectionEnd = 0;
 
+        updateEditorHighlight(result);
         if (typeof editor.focus === 'function') {
           try {
             editor.focus({ preventScroll: true });
@@ -169,6 +314,7 @@ function startApp() {
 
         const resetScrollPositions = () => {
           editor.scrollTop = 0;
+          syncEditorHighlightScroll();
           preview.scrollTop = 0;
           if (toc) {
             toc.scrollTop = 0;
@@ -264,6 +410,7 @@ function startApp() {
         editor.value = text;
         editor.selectionStart = editor.selectionEnd = 0;
 
+        updateEditorHighlight(text);
         if (typeof editor.focus === 'function') {
           try {
             editor.focus({ preventScroll: true });
@@ -278,6 +425,7 @@ function startApp() {
 
         const resetScrollPositions = () => {
           editor.scrollTop = 0;
+          syncEditorHighlightScroll();
           preview.scrollTop = 0;
           if (toc) {
             toc.scrollTop = 0;
@@ -543,10 +691,10 @@ function startApp() {
   };
 
   const syncLineNumberScroll = () => {
-    if (!lineNumbersEnabled || !lineNumberGutter || !editor) {
-      return;
+    if (lineNumbersEnabled && lineNumberGutter && editor) {
+      lineNumberGutter.scrollTop = editor.scrollTop;
     }
-    lineNumberGutter.scrollTop = editor.scrollTop;
+    syncEditorHighlightScroll();
   };
 
   const updateLineNumberButtonLabel = () => {
@@ -690,6 +838,7 @@ function startApp() {
     editor.selectionStart = nextCaret;
     editor.selectionEnd = nextCaret;
 
+    updateEditorHighlight(nextValue);
     AppState.setText(nextValue, 'editor');
     updateLineNumbers();
 
@@ -878,6 +1027,7 @@ function startApp() {
     editor.selectionStart = nextSelectionStart;
     editor.selectionEnd = nextSelectionEnd;
 
+    updateEditorHighlight(nextValue);
     AppState.setText(nextValue, 'editor');
     updateLineNumbers();
 
@@ -941,6 +1091,7 @@ function startApp() {
     editor.selectionStart = nextSelectionStart;
     editor.selectionEnd = nextSelectionEnd;
 
+    updateEditorHighlight(nextValue);
     AppState.setText(nextValue, 'editor');
     updateLineNumbers();
 
@@ -1047,6 +1198,7 @@ function startApp() {
       editor.selectionStart = nextCaret;
       editor.selectionEnd = nextCaret;
 
+      updateEditorHighlight(nextValue);
       AppState.setText(nextValue, 'editor');
       updateLineNumbers();
 
@@ -1415,6 +1567,7 @@ function startApp() {
         editor.scrollTop = prevScrollTop;
       }
     }
+    updateEditorHighlight(text);
     updateLineNumbers();
     syncLineNumberScroll();
     Preview.render(text);
@@ -1539,6 +1692,7 @@ function startApp() {
 
   editor.addEventListener('input', () => {
     hideFormattingMenu();
+    updateEditorHighlight(editor.value);
     AppState.setText(editor.value, 'editor');
     updateLineNumbers();
   });
@@ -1616,6 +1770,7 @@ function startApp() {
     editor.scrollTop = prevScrollTop;
     editor.selectionStart = editor.selectionEnd = newCursorPos;
 
+    updateEditorHighlight(editor.value);
     AppState.setText(editor.value, 'editor');
 
     return true;
@@ -1667,6 +1822,7 @@ function startApp() {
         currentValue.slice(cursorPos);
       editor.value = newValue;
 
+      updateEditorHighlight(newValue);
       AppState.setText(newValue, 'editor');
     };
     reader.readAsDataURL(file);

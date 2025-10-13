@@ -177,6 +177,14 @@ main {
   box-sizing: border-box;
 }
 
+#editor-content-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  box-sizing: border-box;
+  background-color: #ffffff;
+}
+
 #editor-pane textarea {
   flex: 1;
   width: 100%;
@@ -191,6 +199,45 @@ main {
   background-color: #ffffff;
   color: #003366;
   font-family: monospace;
+}
+
+#editor-content-container.editor-highlight-enabled textarea {
+  background-color: transparent;
+  color: transparent;
+  caret-color: #003366;
+  position: relative;
+  z-index: 2;
+}
+
+#editor-highlight {
+  position: absolute;
+  inset: 0;
+  display: none;
+  padding: 1rem;
+  box-sizing: border-box;
+  pointer-events: none;
+  color: #003366;
+  font-family: monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  z-index: 1;
+}
+
+#editor-content-container.editor-highlight-enabled #editor-highlight {
+  display: block;
+}
+
+#editor-highlight .editor-highlight-content {
+  min-height: 100%;
+  transform: translate(0, 0);
+  will-change: transform;
+}
+
+#editor-highlight .external-link-text {
+  color: #2f9ef7;
 }
 
 #line-number-gutter {
