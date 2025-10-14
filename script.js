@@ -655,15 +655,15 @@ function startApp() {
     const minContentWidth = Math.max(0, MIN_EDITOR_WIDTH);
     const minOuterWidth = MIN_EDITOR_WIDTH + padding + gutterWidth;
     const normalizedWidth = Math.max(minOuterWidth, Math.round(width));
-    const contentWidth = Math.max(
-      normalizedWidth - padding - gutterWidth,
-      minContentWidth
+    const borderBoxWidth = Math.max(
+      normalizedWidth - gutterWidth,
+      minContentWidth + padding
     );
     if (editorPane) {
       editorPane.style.width = `${normalizedWidth}px`;
     }
     if (editor) {
-      editor.style.width = `${contentWidth}px`;
+      editor.style.width = `${borderBoxWidth}px`;
     }
     syncEditorHighlightScroll();
   };
