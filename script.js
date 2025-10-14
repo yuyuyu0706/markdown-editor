@@ -20,6 +20,7 @@ function startApp() {
     editorHighlightElement.querySelector('.editor-highlight-content');
   let lastHighlightMarkup = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
+  let lastKnownEditorTextColor = '#003366';
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -130,6 +131,46 @@ function startApp() {
     return Boolean(editorHighlightContent);
   }
 
+  function isTransparentColor(colorValue) {
+    if (!colorValue) {
+      return true;
+    }
+    const normalized = colorValue.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+    if (normalized === 'transparent') {
+      return true;
+    }
+    if (normalized.startsWith('rgba(') || normalized.startsWith('rgb(')) {
+      const parts = normalized
+        .replace(/^rgba?\(/, '')
+        .replace(/\)$/, '')
+        .split(',')
+        .map(part => part.trim());
+      if (parts.length === 4) {
+        const alpha = parseFloat(parts[3]);
+        if (!Number.isNaN(alpha) && alpha <= 0) {
+          return true;
+        }
+      }
+    }
+    if (normalized.startsWith('hsla(') || normalized.startsWith('hsl(')) {
+      const parts = normalized
+        .replace(/^hsla?\(/, '')
+        .replace(/\)$/, '')
+        .split(',')
+        .map(part => part.trim());
+      if (parts.length === 4) {
+        const alpha = parseFloat(parts[3]);
+        if (!Number.isNaN(alpha) && alpha <= 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function syncEditorHighlightPadding() {
     if (!editor || !editorContentContainer) {
       return;
@@ -146,9 +187,13 @@ function startApp() {
       }
     }
     const color = styles.getPropertyValue('color');
-    if (color) {
-      editorContentContainer.style.setProperty('--editor-text-color', color);
+    if (color && !isTransparentColor(color)) {
+      lastKnownEditorTextColor = color;
     }
+    editorContentContainer.style.setProperty(
+      '--editor-text-color',
+      lastKnownEditorTextColor
+    );
     const scrollbarWidth = Math.max(0, editor.offsetWidth - editor.clientWidth);
     editorContentContainer.style.setProperty(
       '--editor-scrollbar-width',
