@@ -58,6 +58,7 @@
       },
       formatting: {
         bold: '𝐁 Bold',
+        externalLink: '🔗 Add External Link',
         copy: '📋 Copy',
         paste: '📥 Paste'
       },
@@ -122,6 +123,7 @@
       },
       formatting: {
         bold: '太字',
+        externalLink: '🔗 外部リンクを追加',
         copy: '📋 コピー',
         paste: '📥 ペースト'
       },

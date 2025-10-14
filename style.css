@@ -177,20 +177,87 @@ main {
   box-sizing: border-box;
 }
 
+#editor-content-container {
+  position: relative;
+  flex: 1;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  font-family: monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #003366;
+  --editor-text-color: #003366;
+  --editor-padding-top: 1rem;
+  --editor-padding-right: 1rem;
+  --editor-padding-bottom: 1rem;
+  --editor-padding-left: 1rem;
+  --editor-scrollbar-width: 0px;
+  --editor-scrollbar-height: 0px;
+}
+
 #editor-pane textarea {
   flex: 1;
   width: 100%;
   height: 100%;
-  padding: 1rem;
+  padding: var(--editor-padding-top, 1rem)
+    var(--editor-padding-right, 1rem)
+    var(--editor-padding-bottom, 1rem)
+    var(--editor-padding-left, 1rem);
   box-sizing: border-box;
   border: none;
   resize: none;
-  font-size: 1rem;
-  line-height: 1.5;
+  font: inherit;
+  line-height: inherit;
   outline: none;
   background-color: #ffffff;
-  color: #003366;
-  font-family: monospace;
+  color: inherit;
+  position: relative;
+  z-index: 2;
+}
+
+#editor-content-container.editor-highlight-enabled textarea {
+  background-color: transparent;
+  color: transparent;
+  caret-color: var(--editor-text-color, #003366);
+}
+
+#editor-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: var(--editor-scrollbar-width, 0px);
+  bottom: var(--editor-scrollbar-height, 0px);
+  display: none;
+  padding: var(--editor-padding-top, 1rem)
+    var(--editor-padding-right, 1rem)
+    var(--editor-padding-bottom, 1rem)
+    var(--editor-padding-left, 1rem);
+  box-sizing: border-box;
+  pointer-events: none;
+  background-color: inherit;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  overflow: hidden;
+  z-index: 1;
+}
+
+#editor-content-container.editor-highlight-enabled #editor-highlight {
+  display: block;
+}
+
+#editor-highlight .editor-highlight-content {
+  min-height: 100%;
+  transform: translate(0, 0);
+  will-change: transform;
+  white-space: inherit;
+}
+
+#editor-highlight .external-link-text {
+  color: #6d7cff;
 }
 
 #line-number-gutter {
