@@ -145,6 +145,20 @@ function startApp() {
         editorContentContainer.style.setProperty(`--editor-padding-${side}`, value);
       }
     }
+    const color = styles.getPropertyValue('color');
+    if (color) {
+      editorContentContainer.style.setProperty('--editor-text-color', color);
+    }
+    const scrollbarWidth = Math.max(0, editor.offsetWidth - editor.clientWidth);
+    editorContentContainer.style.setProperty(
+      '--editor-scrollbar-width',
+      `${scrollbarWidth}px`
+    );
+    const scrollbarHeight = Math.max(0, editor.offsetHeight - editor.clientHeight);
+    editorContentContainer.style.setProperty(
+      '--editor-scrollbar-height',
+      `${scrollbarHeight}px`
+    );
   }
 
   function escapeHighlightHtml(text) {

@@ -191,6 +191,8 @@ main {
   --editor-padding-right: 1rem;
   --editor-padding-bottom: 1rem;
   --editor-padding-left: 1rem;
+  --editor-scrollbar-width: 0px;
+  --editor-scrollbar-height: 0px;
 }
 
 #editor-pane textarea {
@@ -221,7 +223,10 @@ main {
 
 #editor-highlight {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: var(--editor-scrollbar-width, 0px);
+  bottom: var(--editor-scrollbar-height, 0px);
   display: none;
   padding: var(--editor-padding-top, 1rem)
     var(--editor-padding-right, 1rem)
