@@ -130,6 +130,23 @@ function startApp() {
     return Boolean(editorHighlightContent);
   }
 
+  function syncEditorHighlightPadding() {
+    if (!editor || !editorContentContainer) {
+      return;
+    }
+    const styles = window.getComputedStyle(editor);
+    if (!styles) {
+      return;
+    }
+    const paddingSides = ['top', 'right', 'bottom', 'left'];
+    for (const side of paddingSides) {
+      const value = styles.getPropertyValue(`padding-${side}`);
+      if (value) {
+        editorContentContainer.style.setProperty(`--editor-padding-${side}`, value);
+      }
+    }
+  }
+
   function escapeHighlightHtml(text) {
     return (text || '')
       .replace(/&/g, '&amp;')
@@ -185,8 +202,12 @@ function startApp() {
 
   function updateEditorHighlight(value) {
     if (!ensureEditorHighlightStructure()) {
+      if (editorContentContainer) {
+        editorContentContainer.classList.remove('editor-highlight-enabled');
+      }
       return;
     }
+    syncEditorHighlightPadding();
     const markup = buildEditorHighlightMarkup(value);
     if (markup !== lastHighlightMarkup) {
       editorHighlightContent.innerHTML = markup;
@@ -1544,6 +1565,7 @@ function startApp() {
     if (storedEditorWidthRatio !== null && !isDraggingEditor) {
       applyEditorRatio(storedEditorWidthRatio);
     }
+    syncEditorHighlightPadding();
     syncEditorHighlightScroll();
   });
 
