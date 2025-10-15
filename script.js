@@ -1015,6 +1015,74 @@ function startApp() {
     formattingMenuVisible = true;
   }
 
+  function applyInlineCodeFormatting() {
+    if (!editor) {
+      return;
+    }
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+
+    if (typeof start !== 'number' || typeof end !== 'number') {
+      return;
+    }
+
+    const selectionStart = Math.min(start, end);
+    const selectionEnd = Math.max(start, end);
+    const previousValue = editor.value || '';
+    const selectedText = previousValue.slice(selectionStart, selectionEnd);
+    const prevScrollTop = editor.scrollTop;
+
+    let nextValue = previousValue;
+    let nextSelectionStart = selectionStart;
+    let nextSelectionEnd = selectionEnd;
+
+    if (selectionStart === selectionEnd) {
+      const insertion = '``';
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        insertion +
+        previousValue.slice(selectionEnd);
+      nextSelectionStart = selectionStart + 1;
+      nextSelectionEnd = nextSelectionStart;
+    } else if (
+      selectedText.startsWith('`') &&
+      selectedText.endsWith('`') &&
+      selectedText.length >= 2
+    ) {
+      const innerText = selectedText.slice(1, -1);
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        innerText +
+        previousValue.slice(selectionEnd);
+      nextSelectionEnd = nextSelectionStart + innerText.length;
+    } else {
+      const normalized = selectedText.replace(/\r?\n/g, ' ');
+      const wrapped = `\`${normalized}\``;
+      nextValue =
+        previousValue.slice(0, selectionStart) +
+        wrapped +
+        previousValue.slice(selectionEnd);
+      nextSelectionStart = selectionStart;
+      nextSelectionEnd = selectionStart + wrapped.length;
+    }
+
+    editor.value = nextValue;
+    editor.scrollTop = prevScrollTop;
+    editor.selectionStart = nextSelectionStart;
+    editor.selectionEnd = nextSelectionEnd;
+
+    updateEditorHighlight(nextValue);
+    AppState.setText(nextValue, 'editor');
+    updateLineNumbers();
+
+    try {
+      editor.focus({ preventScroll: true });
+    } catch (error) {
+      editor.focus();
+    }
+  }
+
   function applyExternalLinkFormatting() {
     if (!editor) {
       return;
@@ -1365,6 +1433,18 @@ function startApp() {
       hideFormattingMenu();
     });
 
+    const inlineCodeButton = document.createElement('button');
+    inlineCodeButton.type = 'button';
+    inlineCodeButton.className = 'formatting-menu-button';
+    inlineCodeButton.dataset.action = 'inline-code';
+    inlineCodeButton.dataset.i18n = 'formatting.inlineCode';
+    inlineCodeButton.setAttribute('role', 'menuitem');
+    inlineCodeButton.textContent = i18n.t('formatting.inlineCode');
+    inlineCodeButton.addEventListener('click', () => {
+      applyInlineCodeFormatting();
+      hideFormattingMenu();
+    });
+
     const externalLinkButton = document.createElement('button');
     externalLinkButton.type = 'button';
     externalLinkButton.className = 'formatting-menu-button';
@@ -1415,6 +1495,7 @@ function startApp() {
     });
 
     menu.appendChild(boldButton);
+    menu.appendChild(inlineCodeButton);
     menu.appendChild(externalLinkButton);
     menu.appendChild(copyButton);
     menu.appendChild(cutButton);
