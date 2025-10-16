@@ -599,6 +599,7 @@ function startApp() {
   let headings = [];
   let tocItems = [];
   let headingPositions = [];
+  let pendingHeadingAlignmentId = null;
   let editorMeasurementElement = null;
 
   Preview.init();
@@ -2394,6 +2395,7 @@ a:hover {
     if (!event || typeof event.id !== 'string') {
       return;
     }
+    pendingHeadingAlignmentId = event.id;
     const headingInfo = headingPositions.find(h => h.id === event.id);
     const previewDetail = getPreviewScrollTargetForHeading(event.id);
     if (headingInfo) {
@@ -2402,6 +2404,21 @@ a:hover {
     if (Preview && typeof Preview.scrollToHeading === 'function') {
       Preview.scrollToHeading(event.id);
     }
+  });
+
+  Bus.on('preview:scrolled', detail => {
+    if (!detail || typeof detail.id !== 'string') {
+      return;
+    }
+    if (!pendingHeadingAlignmentId || detail.id !== pendingHeadingAlignmentId) {
+      return;
+    }
+    pendingHeadingAlignmentId = null;
+    const headingInfo = headingPositions.find(h => h.id === detail.id);
+    if (!headingInfo) {
+      return;
+    }
+    alignEditorScrollToHeading(headingInfo.start, detail);
   });
 
   Bus.on('settings:changed', event => {
