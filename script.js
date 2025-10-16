@@ -40,6 +40,10 @@ function startApp() {
   const markdownInput = document.getElementById('markdownInput');
   const toggleLineNumbersBtn = document.getElementById('toggle-line-numbers');
   const langSwitch = document.getElementById('lang-switch');
+  const animationFrameSupported =
+    typeof window !== 'undefined' &&
+    typeof window.requestAnimationFrame === 'function' &&
+    typeof window.cancelAnimationFrame === 'function';
 
   if (editor) {
     if (!editorPane) {
@@ -601,6 +605,8 @@ function startApp() {
   let headingPositions = [];
   let pendingHeadingAlignmentId = null;
   let editorMeasurementElement = null;
+  let editorScrollAnimationFrameId = null;
+  let editorScrollAnimationActive = false;
 
   Preview.init();
   adjustTOCPosition();
@@ -1920,6 +1926,95 @@ function startApp() {
     };
   }
 
+  function getAnimationTimestamp() {
+    if (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') {
+      return performance.now();
+    }
+    return Date.now();
+  }
+
+  function stopEditorScrollAnimation() {
+    if (!animationFrameSupported) {
+      editorScrollAnimationFrameId = null;
+      editorScrollAnimationActive = false;
+      return;
+    }
+    if (editorScrollAnimationFrameId !== null) {
+      window.cancelAnimationFrame(editorScrollAnimationFrameId);
+      editorScrollAnimationFrameId = null;
+    }
+    editorScrollAnimationActive = false;
+  }
+
+  function applyEditorScrollTop(value) {
+    if (!editor) {
+      return;
+    }
+    editor.scrollTop = value;
+    syncLineNumberScroll();
+  }
+
+  function animateEditorScrollTo(target) {
+    if (!editor) {
+      return;
+    }
+    if (prefersReducedMotion() || !animationFrameSupported) {
+      stopEditorScrollAnimation();
+      applyEditorScrollTop(target);
+      return;
+    }
+
+    const start = editor.scrollTop;
+    const distance = target - start;
+    if (Math.abs(distance) <= 0.5) {
+      stopEditorScrollAnimation();
+      applyEditorScrollTop(target);
+      return;
+    }
+
+    const durationPerPixel = 0.6;
+    const minDuration = 180;
+    const maxDuration = 420;
+    const duration = Math.min(
+      maxDuration,
+      Math.max(minDuration, Math.abs(distance) * durationPerPixel)
+    );
+    const startTime = getAnimationTimestamp();
+
+    stopEditorScrollAnimation();
+    editorScrollAnimationActive = true;
+
+    const step = () => {
+      if (!editorScrollAnimationActive) {
+        return;
+      }
+      const now = getAnimationTimestamp();
+      const progress = Math.min(1, (now - startTime) / duration);
+      const eased =
+        progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      const nextValue = start + distance * eased;
+      applyEditorScrollTop(progress < 1 ? nextValue : target);
+
+      if (progress < 1) {
+        editorScrollAnimationFrameId = window.requestAnimationFrame(step);
+        return;
+      }
+
+      stopEditorScrollAnimation();
+    };
+
+    editorScrollAnimationFrameId = window.requestAnimationFrame(step);
+  }
+
+  function cancelEditorScrollAnimationOnUserInteraction() {
+    if (!editorScrollAnimationActive) {
+      return;
+    }
+    stopEditorScrollAnimation();
+  }
+
   function alignEditorScrollToHeading(position, previewDetail) {
     if (!editor) {
       return;
@@ -1946,16 +2041,7 @@ function startApp() {
       desiredOffset;
     const maxScroll = Math.max(editor.scrollHeight - editor.clientHeight, 0);
     const clamped = Math.min(Math.max(0, targetScrollTop), maxScroll);
-    if (typeof editor.scrollTo === 'function') {
-      editor.scrollTo({
-        top: clamped,
-        behavior: prefersReducedMotion() ? 'auto' : 'smooth'
-      });
-    } else {
-      editor.scrollTop = clamped;
-    }
-    syncLineNumberScroll();
-    syncEditorHighlightScroll();
+    animateEditorScrollTo(clamped);
   }
 
   function getPreviewScrollTargetForHeading(id) {
@@ -1997,6 +2083,18 @@ function startApp() {
     hideFormattingMenu();
     syncLineNumberScroll();
   });
+
+  editor.addEventListener(
+    'wheel',
+    cancelEditorScrollAnimationOnUserInteraction,
+    { passive: true }
+  );
+  editor.addEventListener(
+    'touchstart',
+    cancelEditorScrollAnimationOnUserInteraction,
+    { passive: true }
+  );
+  editor.addEventListener('mousedown', cancelEditorScrollAnimationOnUserInteraction);
 
   function continueListOnEnter(event) {
     if (
@@ -2073,6 +2171,7 @@ function startApp() {
     return true;
   }
   editor.addEventListener('keydown', event => {
+    cancelEditorScrollAnimationOnUserInteraction();
     if (formattingMenuVisible) {
       const modifierKeys = ['Shift', 'Control', 'Alt', 'Meta'];
       if (!modifierKeys.includes(event.key)) {
