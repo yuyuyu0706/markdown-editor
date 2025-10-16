@@ -49,7 +49,7 @@
   },
   "formatting": {
     "bold": "𝐁 Bold",
-    "inlineCode": "` Code",
+    "inlineCode": "</> Code",
     "externalLink": "🔗 Add External Link",
     "copy": "📋 Copy",
     "cut": "✂️ Cut",
