@@ -2067,8 +2067,25 @@ function startApp() {
     if (!editor || !headingInfo) {
       return;
     }
-    editor.focus();
-    editor.selectionStart = editor.selectionEnd = headingInfo.start;
+    const previousScrollTop = editor.scrollTop;
+    let preventScrollWorked = false;
+    if (typeof editor.focus === 'function') {
+      try {
+        editor.focus({ preventScroll: true });
+        preventScrollWorked = true;
+      } catch (error) {
+        editor.focus();
+      }
+    }
+    if (typeof editor.setSelectionRange === 'function') {
+      editor.setSelectionRange(headingInfo.start, headingInfo.start);
+    } else {
+      editor.selectionStart = editor.selectionEnd = headingInfo.start;
+    }
+    if (!preventScrollWorked && editor.scrollTop !== previousScrollTop) {
+      editor.scrollTop = previousScrollTop;
+      syncLineNumberScroll();
+    }
     updateTOCHighlight();
     alignEditorScrollToHeading(headingInfo.start, previewDetail);
   }
