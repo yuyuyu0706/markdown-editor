@@ -11,6 +11,7 @@
   const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
   const MANUAL_SCROLL_INTENT_DURATION = 1200;
   const HEADING_FLASH_DURATION = 2000;
+  const HEADING_FLASH_FADE_DURATION = 600;
 
   let previewEl = null;
   let toolbarEl = null;
@@ -37,6 +38,7 @@
   const lastScrollInfo = { top: 0, height: 0 };
 
   let previewHeadingFlashTimeout = null;
+  let previewHeadingFadeTimeout = null;
   let activePreviewHeading = null;
 
   if (typeof global.__lastPreviewScrollTarget === 'undefined') {
@@ -732,8 +734,15 @@
       global.clearTimeout(previewHeadingFlashTimeout);
       previewHeadingFlashTimeout = null;
     }
+    if (previewHeadingFadeTimeout) {
+      global.clearTimeout(previewHeadingFadeTimeout);
+      previewHeadingFadeTimeout = null;
+    }
     if (activePreviewHeading) {
-      activePreviewHeading.classList.remove('preview-heading-flash');
+      activePreviewHeading.classList.remove(
+        'preview-heading-flash',
+        'preview-heading-fade-out'
+      );
       activePreviewHeading = null;
     }
   }
@@ -746,20 +755,40 @@
       global.clearTimeout(previewHeadingFlashTimeout);
       previewHeadingFlashTimeout = null;
     }
+    if (previewHeadingFadeTimeout) {
+      global.clearTimeout(previewHeadingFadeTimeout);
+      previewHeadingFadeTimeout = null;
+    }
     if (activePreviewHeading) {
-      activePreviewHeading.classList.remove('preview-heading-flash');
+      activePreviewHeading.classList.remove(
+        'preview-heading-flash',
+        'preview-heading-fade-out'
+      );
       if (activePreviewHeading === element) {
         void element.offsetWidth;
       }
     }
+    element.classList.remove('preview-heading-fade-out');
     element.classList.add('preview-heading-flash');
     activePreviewHeading = element;
     previewHeadingFlashTimeout = global.setTimeout(() => {
-      element.classList.remove('preview-heading-flash');
-      if (activePreviewHeading === element) {
-        activePreviewHeading = null;
-      }
       previewHeadingFlashTimeout = null;
+      if (shouldReduceMotion()) {
+        element.classList.remove('preview-heading-flash');
+        if (activePreviewHeading === element) {
+          activePreviewHeading = null;
+        }
+        return;
+      }
+      element.classList.add('preview-heading-fade-out');
+      previewHeadingFadeTimeout = global.setTimeout(() => {
+        element.classList.remove('preview-heading-fade-out');
+        element.classList.remove('preview-heading-flash');
+        if (activePreviewHeading === element) {
+          activePreviewHeading = null;
+        }
+        previewHeadingFadeTimeout = null;
+      }, HEADING_FLASH_FADE_DURATION);
     }, HEADING_FLASH_DURATION);
   }
 
