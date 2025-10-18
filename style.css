@@ -355,6 +355,11 @@ main {
   color: #0055aa;
 }
 
+#preview .preview-heading-flash {
+  background-color: #fff5b1;
+  transition: background-color 0.5s ease;
+}
+
 pre {
   background: #dfefff;
   padding: 0.5rem;

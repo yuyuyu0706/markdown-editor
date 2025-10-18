@@ -10,6 +10,7 @@
   const INPUT_SCROLL_SUPPRESS_DURATION = 400;
   const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
   const MANUAL_SCROLL_INTENT_DURATION = 1200;
+  const HEADING_FLASH_DURATION = 500;
 
   let previewEl = null;
   let toolbarEl = null;
@@ -34,6 +35,9 @@
   let markedConfigured = false;
 
   const lastScrollInfo = { top: 0, height: 0 };
+
+  let previewHeadingFlashTimeout = null;
+  let activePreviewHeading = null;
 
   if (typeof global.__lastPreviewScrollTarget === 'undefined') {
     global.__lastPreviewScrollTarget = null;
@@ -719,6 +723,36 @@
   }
 
   /**
+   * Apply a transient highlight to a preview heading element.
+   * @param {HTMLElement} element
+   * @returns {void}
+   */
+  function flashPreviewHeading(element) {
+    if (!element) {
+      return;
+    }
+    if (previewHeadingFlashTimeout) {
+      global.clearTimeout(previewHeadingFlashTimeout);
+      previewHeadingFlashTimeout = null;
+    }
+    if (activePreviewHeading) {
+      activePreviewHeading.classList.remove('preview-heading-flash');
+      if (activePreviewHeading === element) {
+        void element.offsetWidth;
+      }
+    }
+    element.classList.add('preview-heading-flash');
+    activePreviewHeading = element;
+    previewHeadingFlashTimeout = global.setTimeout(() => {
+      element.classList.remove('preview-heading-flash');
+      if (activePreviewHeading === element) {
+        activePreviewHeading = null;
+      }
+      previewHeadingFlashTimeout = null;
+    }, HEADING_FLASH_DURATION);
+  }
+
+  /**
    * Scroll the preview to the heading associated with the provided slug.
    * @param {string} slug
    * @returns {void}
@@ -741,6 +775,7 @@
     const detail = { id: slug, top, headerHeight, paddingTop };
     const notify = () => dispatchPreviewScrolled(detail);
 
+    flashPreviewHeading(target);
     registerPreviewManualInteraction();
 
     if (difference <= 1) {

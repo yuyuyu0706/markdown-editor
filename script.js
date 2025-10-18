@@ -20,6 +20,7 @@ function startApp() {
     editorHighlightElement.querySelector('.editor-highlight-content');
   let lastHighlightMarkup = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
+  const HEADING_FLASH_DURATION = 500;
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -62,6 +63,8 @@ function startApp() {
       editorPane.insertBefore(lineNumberGutter, editorPane.firstChild);
     }
   }
+
+  let editorHeadingFlashTimeout = null;
 
   function ensureEditorHighlightStructure() {
     if (!editor) {
@@ -1728,7 +1731,14 @@ function startApp() {
           const count = slugCounts[base] || 0;
           slugCounts[base] = count + 1;
           const id = count ? `${base}-${count}` : base;
-          headingPositions.push({ level, text, id, start: index });
+          const headingLength = line.length;
+          headingPositions.push({
+            level,
+            text,
+            id,
+            start: index,
+            end: index + headingLength
+          });
         }
       }
       index += line.length + 1;
@@ -1986,6 +1996,52 @@ function startApp() {
     }
   }
 
+  function getHeadingSelectionRange(headingInfo) {
+    if (!headingInfo) {
+      return { start: 0, end: 0 };
+    }
+    const start = Number.isFinite(headingInfo.start) ? headingInfo.start : 0;
+    let end = Number.isFinite(headingInfo.end) ? headingInfo.end : start;
+    if (!Number.isFinite(end) || end < start) {
+      const value = editor && typeof editor.value === 'string' ? editor.value : '';
+      if (value) {
+        const newlineIndex = value.indexOf('\n', start);
+        end = newlineIndex === -1 ? value.length : newlineIndex;
+      } else {
+        end = start;
+      }
+    }
+    if (end < start) {
+      end = start;
+    }
+    return { start, end };
+  }
+
+  function flashEditorHeading(headingInfo) {
+    if (!editor || !headingInfo) {
+      return;
+    }
+    const { start, end } = getHeadingSelectionRange(headingInfo);
+    if (typeof editor.setSelectionRange === 'function') {
+      editor.setSelectionRange(start, end, 'forward');
+    } else {
+      editor.selectionStart = start;
+      editor.selectionEnd = end;
+    }
+    if (editorHeadingFlashTimeout) {
+      window.clearTimeout(editorHeadingFlashTimeout);
+    }
+    editorHeadingFlashTimeout = window.setTimeout(() => {
+      if (typeof editor.setSelectionRange === 'function') {
+        editor.setSelectionRange(start, start, 'forward');
+      } else {
+        editor.selectionStart = start;
+        editor.selectionEnd = start;
+      }
+      editorHeadingFlashTimeout = null;
+    }, HEADING_FLASH_DURATION);
+  }
+
   function focusEditorOnHeading(headingInfo, previewDetail) {
     if (!editor || !headingInfo) {
       return;
@@ -2011,6 +2067,7 @@ function startApp() {
     }
     updateTOCHighlight();
     alignEditorScrollToHeading(headingInfo.start, previewDetail);
+    flashEditorHeading(headingInfo);
   }
 
   editor.addEventListener('input', () => {
