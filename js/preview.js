@@ -782,7 +782,6 @@
     }
     const { top, headerHeight, paddingTop } = computeScrollTarget(target);
     const difference = Math.abs(previewEl.scrollTop - top);
-    const behavior = shouldReduceMotion() ? 'auto' : 'smooth';
     const detail = { id: slug, top, headerHeight, paddingTop };
     const notify = () => dispatchPreviewScrolled(detail);
 
@@ -791,19 +790,8 @@
     if (difference <= 1) {
       global.requestAnimationFrame(notify);
     } else {
-      previewEl.scrollTo({ top, behavior });
-      if (behavior === 'auto') {
-        global.requestAnimationFrame(notify);
-      } else {
-        const waitForSettle = () => {
-          if (Math.abs(previewEl.scrollTop - top) <= 1) {
-            notify();
-          } else {
-            global.requestAnimationFrame(waitForSettle);
-          }
-        };
-        waitForSettle();
-      }
+      previewEl.scrollTop = top;
+      global.requestAnimationFrame(notify);
     }
   }
 
