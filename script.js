@@ -20,7 +20,7 @@ function startApp() {
     editorHighlightElement.querySelector('.editor-highlight-content');
   let lastHighlightMarkup = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
-  const HEADING_FLASH_DURATION = 500;
+  const HEADING_FLASH_DURATION = 2000;
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
