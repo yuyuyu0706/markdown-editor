@@ -273,6 +273,23 @@ main {
   box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
 }
 
+#editor-highlight .editor-heading-flash.editor-heading-fade-out {
+  animation: editor-heading-fade-out var(--heading-flash-fade-duration, 600ms)
+    ease-out forwards;
+}
+
+@keyframes editor-heading-fade-out {
+  0% {
+    background-color: var(--heading-flash-bg, #fff8b3);
+    box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 rgba(255, 248, 179, 0);
+  }
+}
+
 #editor-highlight .external-link-text {
   color: #6d7cff;
 }
@@ -375,6 +392,23 @@ main {
 #preview .preview-heading-flash {
   background-color: var(--heading-flash-bg, #fff8b3);
   box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
+}
+
+#preview .preview-heading-flash.preview-heading-fade-out {
+  animation: preview-heading-fade-out var(--heading-flash-fade-duration, 600ms)
+    ease-out forwards;
+}
+
+@keyframes preview-heading-fade-out {
+  0% {
+    background-color: var(--heading-flash-bg, #fff8b3);
+    box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 rgba(255, 248, 179, 0);
+  }
 }
 
 pre {
