@@ -608,8 +608,9 @@ function startApp() {
   let editorScrollAnimationFrameId = null;
   let editorScrollAnimationActive = false;
   let editorScrollAnimationTarget = null;
-  let editorScrollAnimationVelocity = 0;
-  let editorScrollAnimationLastTimestamp = 0;
+  let editorScrollAnimationStartValue = 0;
+  let editorScrollAnimationStartTime = 0;
+  let editorScrollAnimationDuration = 0;
 
   Preview.init();
   adjustTOCPosition();
@@ -1934,8 +1935,9 @@ function startApp() {
       editorScrollAnimationFrameId = null;
       editorScrollAnimationActive = false;
       editorScrollAnimationTarget = null;
-      editorScrollAnimationVelocity = 0;
-      editorScrollAnimationLastTimestamp = 0;
+      editorScrollAnimationStartValue = 0;
+      editorScrollAnimationStartTime = 0;
+      editorScrollAnimationDuration = 0;
       return;
     }
     if (editorScrollAnimationFrameId !== null) {
@@ -1944,8 +1946,9 @@ function startApp() {
     }
     editorScrollAnimationActive = false;
     editorScrollAnimationTarget = null;
-    editorScrollAnimationVelocity = 0;
-    editorScrollAnimationLastTimestamp = 0;
+    editorScrollAnimationStartValue = 0;
+    editorScrollAnimationStartTime = 0;
+    editorScrollAnimationDuration = 0;
   }
 
   function applyEditorScrollTop(value) {
@@ -1956,10 +1959,25 @@ function startApp() {
     syncLineNumberScroll();
   }
 
-  const EDITOR_SCROLL_FRAME_MS = 16.6667;
-  const EDITOR_SCROLL_MAX_FRAME_STEP = 4;
-  const EDITOR_SCROLL_SPRING_STIFFNESS = 0.18;
-  const EDITOR_SCROLL_SPRING_DAMPING = 0.82;
+  const EDITOR_SCROLL_MIN_DURATION = 200;
+  const EDITOR_SCROLL_MAX_DURATION = 450;
+  const EDITOR_SCROLL_DISTANCE_FOR_MAX_DURATION = 1200;
+
+  function computeEditorScrollDuration(distance) {
+    if (!Number.isFinite(distance) || distance <= 0) {
+      return 0;
+    }
+    const clampedDistance = Math.min(distance, EDITOR_SCROLL_DISTANCE_FOR_MAX_DURATION);
+    const distanceRatio = clampedDistance / EDITOR_SCROLL_DISTANCE_FOR_MAX_DURATION;
+    return (
+      EDITOR_SCROLL_MIN_DURATION +
+      (EDITOR_SCROLL_MAX_DURATION - EDITOR_SCROLL_MIN_DURATION) * distanceRatio
+    );
+  }
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
 
   function runEditorScrollAnimation(timestamp) {
     if (!editorScrollAnimationActive || editorScrollAnimationTarget === null) {
@@ -1976,48 +1994,30 @@ function startApp() {
       return;
     }
 
-    if (!editorScrollAnimationLastTimestamp) {
-      editorScrollAnimationLastTimestamp = timestamp;
-      editorScrollAnimationFrameId = window.requestAnimationFrame(runEditorScrollAnimation);
-      return;
+    if (!editorScrollAnimationStartTime) {
+      editorScrollAnimationStartTime = timestamp;
     }
 
-    const deltaFactor = Math.min(
-      (timestamp - editorScrollAnimationLastTimestamp) / EDITOR_SCROLL_FRAME_MS,
-      EDITOR_SCROLL_MAX_FRAME_STEP
-    );
-    editorScrollAnimationLastTimestamp = timestamp;
+    const elapsed = timestamp - editorScrollAnimationStartTime;
+    const duration = editorScrollAnimationDuration;
 
-    const current = editor.scrollTop;
-    const target = editorScrollAnimationTarget;
-    const difference = target - current;
-
-    if (
-      Math.abs(difference) <= 0.2 &&
-      Math.abs(editorScrollAnimationVelocity) <= 0.2
-    ) {
-      applyEditorScrollTop(target);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      applyEditorScrollTop(editorScrollAnimationTarget);
       stopEditorScrollAnimation();
       return;
     }
 
-    editorScrollAnimationVelocity +=
-      difference * EDITOR_SCROLL_SPRING_STIFFNESS * deltaFactor;
-    editorScrollAnimationVelocity *= Math.pow(
-      EDITOR_SCROLL_SPRING_DAMPING,
-      deltaFactor
-    );
-
-    let nextValue = current + editorScrollAnimationVelocity;
-    const maxScroll = Math.max(editor.scrollHeight - editor.clientHeight, 0);
-    if (nextValue < 0) {
-      nextValue = 0;
-      editorScrollAnimationVelocity = 0;
-    } else if (nextValue > maxScroll) {
-      nextValue = maxScroll;
-      editorScrollAnimationVelocity = 0;
+    if (elapsed >= duration) {
+      applyEditorScrollTop(editorScrollAnimationTarget);
+      stopEditorScrollAnimation();
+      return;
     }
 
+    const progress = Math.min(Math.max(elapsed / duration, 0), 1);
+    const eased = easeOutCubic(progress);
+    const nextValue =
+      editorScrollAnimationStartValue +
+      (editorScrollAnimationTarget - editorScrollAnimationStartValue) * eased;
     applyEditorScrollTop(nextValue);
 
     if (!editorScrollAnimationActive) {
@@ -2031,26 +2031,39 @@ function startApp() {
     if (!editor) {
       return;
     }
+
+    const maxScroll = Math.max(editor.scrollHeight - editor.clientHeight, 0);
+    const clampedTarget = Math.min(Math.max(target, 0), maxScroll);
+
     if (prefersReducedMotion() || !animationFrameSupported) {
       stopEditorScrollAnimation();
-      applyEditorScrollTop(target);
+      applyEditorScrollTop(clampedTarget);
       return;
     }
 
     const current = editor.scrollTop;
-    if (!editorScrollAnimationActive && Math.abs(target - current) <= 0.5) {
-      applyEditorScrollTop(target);
+    if (!editorScrollAnimationActive && Math.abs(clampedTarget - current) <= 0.5) {
+      applyEditorScrollTop(clampedTarget);
       return;
     }
 
-    editorScrollAnimationTarget = target;
+    editorScrollAnimationTarget = clampedTarget;
+    editorScrollAnimationStartValue = current;
+    editorScrollAnimationDuration = computeEditorScrollDuration(
+      Math.abs(editorScrollAnimationTarget - editorScrollAnimationStartValue)
+    );
+
+    if (!editorScrollAnimationDuration) {
+      const immediateTarget = editorScrollAnimationTarget;
+      stopEditorScrollAnimation();
+      applyEditorScrollTop(immediateTarget);
+      return;
+    }
+
+    editorScrollAnimationStartTime = 0;
 
     if (!editorScrollAnimationActive) {
       editorScrollAnimationActive = true;
-      editorScrollAnimationVelocity = 0;
-      editorScrollAnimationLastTimestamp = 0;
-      editorScrollAnimationFrameId = window.requestAnimationFrame(runEditorScrollAnimation);
-      return;
     }
 
     if (editorScrollAnimationFrameId === null) {
