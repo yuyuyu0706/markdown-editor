@@ -20,6 +20,8 @@ function startApp() {
     editorHighlightElement.querySelector('.editor-highlight-content');
   let lastHighlightMarkup = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
+  const HIGHLIGHT_START_TOKEN = '\uF111';
+  const HIGHLIGHT_END_TOKEN = '\uF112';
   const HEADING_FLASH_DURATION = 2000;
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
@@ -64,7 +66,8 @@ function startApp() {
     }
   }
 
-  let editorHeadingFlashTimeout = null;
+  let editorHeadingHighlightTimeout = null;
+  let editorHeadingHighlightRange = null;
 
   function ensureEditorHighlightStructure() {
     if (!editor) {
@@ -180,10 +183,28 @@ function startApp() {
       .replace(/'/g, '&#39;');
   }
 
-  function buildEditorHighlightMarkup(value) {
+  function buildEditorHighlightMarkup(value, highlightRange) {
     const normalized = typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : '';
     if (!normalized) {
       return HIGHLIGHT_PLACEHOLDER;
+    }
+
+    let working = normalized;
+    if (
+      highlightRange &&
+      Number.isFinite(highlightRange.start) &&
+      Number.isFinite(highlightRange.end)
+    ) {
+      const start = Math.max(0, Math.min(highlightRange.start, working.length));
+      const end = Math.max(start, Math.min(highlightRange.end, working.length));
+      if (end > start) {
+        working =
+          working.slice(0, start) +
+          HIGHLIGHT_START_TOKEN +
+          working.slice(start, end) +
+          HIGHLIGHT_END_TOKEN +
+          working.slice(end);
+      }
     }
 
     const pattern = /\[([^\]]*?)\]\(([^)]*?)\)/g;
@@ -191,14 +212,24 @@ function startApp() {
     let lastIndex = 0;
     let match;
 
-    while ((match = pattern.exec(normalized)) !== null) {
+    while ((match = pattern.exec(working)) !== null) {
       const startIndex = match.index;
       const endIndex = pattern.lastIndex;
-      result += escapeHighlightHtml(normalized.slice(lastIndex, startIndex));
+      result += escapeHighlightHtml(working.slice(lastIndex, startIndex));
 
-      const isImageSyntax = startIndex > 0 && normalized.charAt(startIndex - 1) === '!';
+      let isImageSyntax = false;
+      let lookbehindIndex = startIndex - 1;
+      while (lookbehindIndex >= 0) {
+        const char = working.charAt(lookbehindIndex);
+        if (char === HIGHLIGHT_START_TOKEN || char === HIGHLIGHT_END_TOKEN) {
+          lookbehindIndex -= 1;
+          continue;
+        }
+        isImageSyntax = char === '!';
+        break;
+      }
       if (isImageSyntax) {
-        result += escapeHighlightHtml(normalized.slice(startIndex, endIndex));
+        result += escapeHighlightHtml(working.slice(startIndex, endIndex));
       } else {
         result += '[';
         const linkText = match[1];
@@ -211,8 +242,13 @@ function startApp() {
       lastIndex = endIndex;
     }
 
-    result += escapeHighlightHtml(normalized.slice(lastIndex));
-    return result + HIGHLIGHT_PLACEHOLDER;
+    result += escapeHighlightHtml(working.slice(lastIndex));
+    const highlightedMarkup = result
+      .split(HIGHLIGHT_START_TOKEN)
+      .join('<span class="editor-heading-flash">')
+      .split(HIGHLIGHT_END_TOKEN)
+      .join('</span>');
+    return highlightedMarkup + HIGHLIGHT_PLACEHOLDER;
   }
 
   function syncEditorHighlightScroll() {
@@ -232,7 +268,7 @@ function startApp() {
       return;
     }
     syncEditorHighlightPadding();
-    const markup = buildEditorHighlightMarkup(value);
+    const markup = buildEditorHighlightMarkup(value, editorHeadingHighlightRange);
     if (markup !== lastHighlightMarkup) {
       editorHighlightContent.innerHTML = markup;
       lastHighlightMarkup = markup;
@@ -2021,24 +2057,22 @@ function startApp() {
     if (!editor || !headingInfo) {
       return;
     }
-    const { start, end } = getHeadingSelectionRange(headingInfo);
-    if (typeof editor.setSelectionRange === 'function') {
-      editor.setSelectionRange(start, end, 'forward');
-    } else {
-      editor.selectionStart = start;
-      editor.selectionEnd = end;
+    const range = getHeadingSelectionRange(headingInfo);
+    if (!range || range.end <= range.start) {
+      return;
     }
-    if (editorHeadingFlashTimeout) {
-      window.clearTimeout(editorHeadingFlashTimeout);
+    editorHeadingHighlightRange = range;
+    if (editorHeadingHighlightTimeout) {
+      window.clearTimeout(editorHeadingHighlightTimeout);
+      editorHeadingHighlightTimeout = null;
     }
-    editorHeadingFlashTimeout = window.setTimeout(() => {
-      if (typeof editor.setSelectionRange === 'function') {
-        editor.setSelectionRange(start, start, 'forward');
-      } else {
-        editor.selectionStart = start;
-        editor.selectionEnd = start;
-      }
-      editorHeadingFlashTimeout = null;
+    lastHighlightMarkup = null;
+    updateEditorHighlight(editor.value);
+    editorHeadingHighlightTimeout = window.setTimeout(() => {
+      editorHeadingHighlightRange = null;
+      lastHighlightMarkup = null;
+      updateEditorHighlight(editor.value);
+      editorHeadingHighlightTimeout = null;
     }, HEADING_FLASH_DURATION);
   }
 
@@ -2072,6 +2106,14 @@ function startApp() {
 
   editor.addEventListener('input', () => {
     hideFormattingMenu();
+    if (editorHeadingHighlightTimeout) {
+      window.clearTimeout(editorHeadingHighlightTimeout);
+      editorHeadingHighlightTimeout = null;
+    }
+    if (editorHeadingHighlightRange) {
+      editorHeadingHighlightRange = null;
+    }
+    lastHighlightMarkup = null;
     updateEditorHighlight(editor.value);
     AppState.setText(editor.value, 'editor');
     updateLineNumbers();

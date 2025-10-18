@@ -256,8 +256,23 @@ main {
   white-space: inherit;
 }
 
+#editor-highlight .editor-heading-flash {
+  background-color: #fff9c4;
+  animation: editor-heading-flash-fade 2s ease forwards;
+}
+
 #editor-highlight .external-link-text {
   color: #6d7cff;
+}
+
+@keyframes editor-heading-flash-fade {
+  0% {
+    background-color: #fff9c4;
+  }
+
+  100% {
+    background-color: transparent;
+  }
 }
 
 #line-number-gutter {
