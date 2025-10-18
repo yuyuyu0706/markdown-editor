@@ -23,6 +23,7 @@ function startApp() {
   const HIGHLIGHT_START_TOKEN = '\uF111';
   const HIGHLIGHT_END_TOKEN = '\uF112';
   const HEADING_FLASH_DURATION = 2000;
+  const HEADING_FLASH_FADE_DURATION = 600;
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -66,7 +67,9 @@ function startApp() {
     }
   }
 
-  let editorHeadingHighlightTimeout = null;
+  let editorHeadingFlashTimeout = null;
+  let editorHeadingFadeTimeout = null;
+  let isEditorHeadingFading = false;
   let editorHeadingHighlightRange = null;
 
   function ensureEditorHighlightStructure() {
@@ -132,6 +135,13 @@ function startApp() {
       );
     }
 
+    if (editorHighlightElement) {
+      editorHighlightElement.style.setProperty(
+        '--heading-flash-fade-duration',
+        `${HEADING_FLASH_FADE_DURATION}ms`
+      );
+    }
+
     return Boolean(editorHighlightContent);
   }
 
@@ -145,6 +155,44 @@ function startApp() {
       console.warn('[Accessibility] Unable to determine reduced motion preference.', error);
       return false;
     }
+  }
+
+  function getEditorHeadingFlashElements() {
+    if (!editorHighlightContent) {
+      return [];
+    }
+    return Array.from(
+      editorHighlightContent.querySelectorAll('.editor-heading-flash')
+    );
+  }
+
+  function clearEditorHeadingFadeState() {
+    const elements = getEditorHeadingFlashElements();
+    for (const element of elements) {
+      element.classList.remove('editor-heading-fade-out');
+    }
+    isEditorHeadingFading = false;
+  }
+
+  function clearEditorHeadingTimers() {
+    if (editorHeadingFlashTimeout) {
+      window.clearTimeout(editorHeadingFlashTimeout);
+      editorHeadingFlashTimeout = null;
+    }
+    if (editorHeadingFadeTimeout) {
+      window.clearTimeout(editorHeadingFadeTimeout);
+      editorHeadingFadeTimeout = null;
+    }
+  }
+
+  function stopEditorHeadingHighlight() {
+    clearEditorHeadingTimers();
+    clearEditorHeadingFadeState();
+    if (editorHeadingHighlightRange) {
+      editorHeadingHighlightRange = null;
+    }
+    lastHighlightMarkup = null;
+    updateEditorHighlight(editor ? editor.value : '');
   }
 
   function syncEditorHighlightPadding() {
@@ -272,6 +320,12 @@ function startApp() {
     if (markup !== lastHighlightMarkup) {
       editorHighlightContent.innerHTML = markup;
       lastHighlightMarkup = markup;
+    }
+    if (isEditorHeadingFading) {
+      const highlightElements = getEditorHeadingFlashElements();
+      for (const element of highlightElements) {
+        element.classList.add('editor-heading-fade-out');
+      }
     }
     if (editorContentContainer) {
       editorContentContainer.classList.add('editor-highlight-enabled');
@@ -2090,17 +2144,29 @@ function startApp() {
       return;
     }
     editorHeadingHighlightRange = range;
-    if (editorHeadingHighlightTimeout) {
-      window.clearTimeout(editorHeadingHighlightTimeout);
-      editorHeadingHighlightTimeout = null;
-    }
+    clearEditorHeadingTimers();
+    clearEditorHeadingFadeState();
     lastHighlightMarkup = null;
     updateEditorHighlight(editor.value);
-    editorHeadingHighlightTimeout = window.setTimeout(() => {
-      editorHeadingHighlightRange = null;
-      lastHighlightMarkup = null;
-      updateEditorHighlight(editor.value);
-      editorHeadingHighlightTimeout = null;
+    editorHeadingFlashTimeout = window.setTimeout(() => {
+      editorHeadingFlashTimeout = null;
+      if (prefersReducedMotion()) {
+        stopEditorHeadingHighlight();
+        return;
+      }
+      const highlightElements = getEditorHeadingFlashElements();
+      if (!highlightElements.length) {
+        stopEditorHeadingHighlight();
+        return;
+      }
+      for (const element of highlightElements) {
+        element.classList.add('editor-heading-fade-out');
+      }
+      isEditorHeadingFading = true;
+      editorHeadingFadeTimeout = window.setTimeout(() => {
+        editorHeadingFadeTimeout = null;
+        stopEditorHeadingHighlight();
+      }, HEADING_FLASH_FADE_DURATION);
     }, HEADING_FLASH_DURATION);
   }
 
@@ -2133,15 +2199,7 @@ function startApp() {
 
   editor.addEventListener('input', () => {
     hideFormattingMenu();
-    if (editorHeadingHighlightTimeout) {
-      window.clearTimeout(editorHeadingHighlightTimeout);
-      editorHeadingHighlightTimeout = null;
-    }
-    if (editorHeadingHighlightRange) {
-      editorHeadingHighlightRange = null;
-    }
-    lastHighlightMarkup = null;
-    updateEditorHighlight(editor.value);
+    stopEditorHeadingHighlight();
     AppState.setText(editor.value, 'editor');
     updateLineNumbers();
   });
