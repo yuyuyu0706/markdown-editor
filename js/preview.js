@@ -10,6 +10,7 @@
   const INPUT_SCROLL_SUPPRESS_DURATION = 400;
   const PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION = 400;
   const MANUAL_SCROLL_INTENT_DURATION = 1200;
+  const HEADING_FLASH_DURATION = 2000;
 
   let previewEl = null;
   let toolbarEl = null;
@@ -34,6 +35,9 @@
   let markedConfigured = false;
 
   const lastScrollInfo = { top: 0, height: 0 };
+
+  let previewHeadingFlashTimeout = null;
+  let activePreviewHeading = null;
 
   if (typeof global.__lastPreviewScrollTarget === 'undefined') {
     global.__lastPreviewScrollTarget = null;
@@ -719,6 +723,47 @@
   }
 
   /**
+   * Apply a transient highlight to a preview heading element.
+   * @param {HTMLElement} element
+   * @returns {void}
+   */
+  function resetPreviewHeadingFlash() {
+    if (previewHeadingFlashTimeout) {
+      global.clearTimeout(previewHeadingFlashTimeout);
+      previewHeadingFlashTimeout = null;
+    }
+    if (activePreviewHeading) {
+      activePreviewHeading.classList.remove('preview-heading-flash');
+      activePreviewHeading = null;
+    }
+  }
+
+  function flashPreviewHeading(element) {
+    if (!element) {
+      return;
+    }
+    if (previewHeadingFlashTimeout) {
+      global.clearTimeout(previewHeadingFlashTimeout);
+      previewHeadingFlashTimeout = null;
+    }
+    if (activePreviewHeading) {
+      activePreviewHeading.classList.remove('preview-heading-flash');
+      if (activePreviewHeading === element) {
+        void element.offsetWidth;
+      }
+    }
+    element.classList.add('preview-heading-flash');
+    activePreviewHeading = element;
+    previewHeadingFlashTimeout = global.setTimeout(() => {
+      element.classList.remove('preview-heading-flash');
+      if (activePreviewHeading === element) {
+        activePreviewHeading = null;
+      }
+      previewHeadingFlashTimeout = null;
+    }, HEADING_FLASH_DURATION);
+  }
+
+  /**
    * Scroll the preview to the heading associated with the provided slug.
    * @param {string} slug
    * @returns {void}
@@ -759,6 +804,33 @@
         };
         waitForSettle();
       }
+    }
+  }
+
+  function highlightHeadingById(slug) {
+    if (!previewEl || !slug) {
+      return;
+    }
+
+    const applyHighlight = () => {
+      let selector = '#' + slug;
+      if (global.CSS && typeof global.CSS.escape === 'function') {
+        selector = '#' + global.CSS.escape(slug);
+      }
+      const target = previewEl.querySelector(selector);
+      if (!target) {
+        resetPreviewHeadingFlash();
+        return;
+      }
+      flashPreviewHeading(target);
+    };
+
+    if (typeof global.requestAnimationFrame === 'function') {
+      global.requestAnimationFrame(() => {
+        global.requestAnimationFrame(applyHighlight);
+      });
+    } else {
+      global.setTimeout(applyHighlight, 0);
     }
   }
 
@@ -809,6 +881,8 @@
     init,
     render,
     scrollToHeading,
+    clearHeadingHighlight: resetPreviewHeadingFlash,
+    highlightHeading: highlightHeadingById,
     getCurrentScrollInfo,
     computeScrollTarget
   };

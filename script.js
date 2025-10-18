@@ -20,6 +20,9 @@ function startApp() {
     editorHighlightElement.querySelector('.editor-highlight-content');
   let lastHighlightMarkup = null;
   const HIGHLIGHT_PLACEHOLDER = '&#8203;';
+  const HIGHLIGHT_START_TOKEN = '\uF111';
+  const HIGHLIGHT_END_TOKEN = '\uF112';
+  const HEADING_FLASH_DURATION = 2000;
   const preview = document.getElementById('preview');
   const divider = document.getElementById('divider');
   const tocDivider = document.getElementById('toc-divider');
@@ -62,6 +65,9 @@ function startApp() {
       editorPane.insertBefore(lineNumberGutter, editorPane.firstChild);
     }
   }
+
+  let editorHeadingHighlightTimeout = null;
+  let editorHeadingHighlightRange = null;
 
   function ensureEditorHighlightStructure() {
     if (!editor) {
@@ -177,10 +183,28 @@ function startApp() {
       .replace(/'/g, '&#39;');
   }
 
-  function buildEditorHighlightMarkup(value) {
+  function buildEditorHighlightMarkup(value, highlightRange) {
     const normalized = typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : '';
     if (!normalized) {
       return HIGHLIGHT_PLACEHOLDER;
+    }
+
+    let working = normalized;
+    if (
+      highlightRange &&
+      Number.isFinite(highlightRange.start) &&
+      Number.isFinite(highlightRange.end)
+    ) {
+      const start = Math.max(0, Math.min(highlightRange.start, working.length));
+      const end = Math.max(start, Math.min(highlightRange.end, working.length));
+      if (end > start) {
+        working =
+          working.slice(0, start) +
+          HIGHLIGHT_START_TOKEN +
+          working.slice(start, end) +
+          HIGHLIGHT_END_TOKEN +
+          working.slice(end);
+      }
     }
 
     const pattern = /\[([^\]]*?)\]\(([^)]*?)\)/g;
@@ -188,14 +212,24 @@ function startApp() {
     let lastIndex = 0;
     let match;
 
-    while ((match = pattern.exec(normalized)) !== null) {
+    while ((match = pattern.exec(working)) !== null) {
       const startIndex = match.index;
       const endIndex = pattern.lastIndex;
-      result += escapeHighlightHtml(normalized.slice(lastIndex, startIndex));
+      result += escapeHighlightHtml(working.slice(lastIndex, startIndex));
 
-      const isImageSyntax = startIndex > 0 && normalized.charAt(startIndex - 1) === '!';
+      let isImageSyntax = false;
+      let lookbehindIndex = startIndex - 1;
+      while (lookbehindIndex >= 0) {
+        const char = working.charAt(lookbehindIndex);
+        if (char === HIGHLIGHT_START_TOKEN || char === HIGHLIGHT_END_TOKEN) {
+          lookbehindIndex -= 1;
+          continue;
+        }
+        isImageSyntax = char === '!';
+        break;
+      }
       if (isImageSyntax) {
-        result += escapeHighlightHtml(normalized.slice(startIndex, endIndex));
+        result += escapeHighlightHtml(working.slice(startIndex, endIndex));
       } else {
         result += '[';
         const linkText = match[1];
@@ -208,8 +242,13 @@ function startApp() {
       lastIndex = endIndex;
     }
 
-    result += escapeHighlightHtml(normalized.slice(lastIndex));
-    return result + HIGHLIGHT_PLACEHOLDER;
+    result += escapeHighlightHtml(working.slice(lastIndex));
+    const highlightedMarkup = result
+      .split(HIGHLIGHT_START_TOKEN)
+      .join('<span class="editor-heading-flash">')
+      .split(HIGHLIGHT_END_TOKEN)
+      .join('</span>');
+    return highlightedMarkup + HIGHLIGHT_PLACEHOLDER;
   }
 
   function syncEditorHighlightScroll() {
@@ -229,7 +268,7 @@ function startApp() {
       return;
     }
     syncEditorHighlightPadding();
-    const markup = buildEditorHighlightMarkup(value);
+    const markup = buildEditorHighlightMarkup(value, editorHeadingHighlightRange);
     if (markup !== lastHighlightMarkup) {
       editorHighlightContent.innerHTML = markup;
       lastHighlightMarkup = markup;
@@ -598,7 +637,9 @@ function startApp() {
   let headings = [];
   let tocItems = [];
   let headingPositions = [];
+  let headingInfoById = new Map();
   let pendingHeadingAlignmentId = null;
+  let pendingHeadingHighlightId = null;
   let editorMeasurementElement = null;
 
   Preview.init();
@@ -1705,8 +1746,35 @@ function startApp() {
 
   function buildTOC() {
     const raw = AppState.getText();
-    const slugCounts = {};
+    const globalWindow = typeof window !== 'undefined' ? window : undefined;
+    const slugger =
+      globalWindow &&
+      globalWindow.Slug &&
+      typeof globalWindow.Slug.createGenerator === 'function'
+        ? globalWindow.Slug.createGenerator()
+        : (() => {
+            const counts = Object.create(null);
+            return text => {
+              let source = typeof text === 'string' ? text : '';
+              try {
+                source = source.normalize('NFKD');
+              } catch (error) {
+                // ignore unsupported normalize
+              }
+              const base = source
+                .toLowerCase()
+                .replace(/\p{M}+/gu, '')
+                .trim()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/-{2,}/g, '-')
+                .replace(/^-+|-+$/g, '') || 'section';
+              const current = counts[base] || 0;
+              counts[base] = current + 1;
+              return current ? `${base}-${current}` : base;
+            };
+          })();
     headingPositions = [];
+    headingInfoById = new Map();
 
     // Collect heading lines while ignoring fenced code blocks
     const lines = raw.split('\n');
@@ -1724,11 +1792,17 @@ function startApp() {
         if (m) {
           const level = m[1].length;
           const text = m[2].trim();
-          const base = text.toLowerCase().replace(/[^\w]+/g, '-');
-          const count = slugCounts[base] || 0;
-          slugCounts[base] = count + 1;
-          const id = count ? `${base}-${count}` : base;
-          headingPositions.push({ level, text, id, start: index });
+          const id = slugger(text);
+          const headingLength = line.length;
+          const info = {
+            level,
+            text,
+            id,
+            start: index,
+            end: index + headingLength
+          };
+          headingPositions.push(info);
+          headingInfoById.set(id, info);
         }
       }
       index += line.length + 1;
@@ -1986,6 +2060,50 @@ function startApp() {
     }
   }
 
+  function getHeadingSelectionRange(headingInfo) {
+    if (!headingInfo) {
+      return { start: 0, end: 0 };
+    }
+    const start = Number.isFinite(headingInfo.start) ? headingInfo.start : 0;
+    let end = Number.isFinite(headingInfo.end) ? headingInfo.end : start;
+    if (!Number.isFinite(end) || end < start) {
+      const value = editor && typeof editor.value === 'string' ? editor.value : '';
+      if (value) {
+        const newlineIndex = value.indexOf('\n', start);
+        end = newlineIndex === -1 ? value.length : newlineIndex;
+      } else {
+        end = start;
+      }
+    }
+    if (end < start) {
+      end = start;
+    }
+    return { start, end };
+  }
+
+  function flashEditorHeading(headingInfo) {
+    if (!editor || !headingInfo) {
+      return;
+    }
+    const range = getHeadingSelectionRange(headingInfo);
+    if (!range || range.end <= range.start) {
+      return;
+    }
+    editorHeadingHighlightRange = range;
+    if (editorHeadingHighlightTimeout) {
+      window.clearTimeout(editorHeadingHighlightTimeout);
+      editorHeadingHighlightTimeout = null;
+    }
+    lastHighlightMarkup = null;
+    updateEditorHighlight(editor.value);
+    editorHeadingHighlightTimeout = window.setTimeout(() => {
+      editorHeadingHighlightRange = null;
+      lastHighlightMarkup = null;
+      updateEditorHighlight(editor.value);
+      editorHeadingHighlightTimeout = null;
+    }, HEADING_FLASH_DURATION);
+  }
+
   function focusEditorOnHeading(headingInfo, previewDetail) {
     if (!editor || !headingInfo) {
       return;
@@ -2015,6 +2133,14 @@ function startApp() {
 
   editor.addEventListener('input', () => {
     hideFormattingMenu();
+    if (editorHeadingHighlightTimeout) {
+      window.clearTimeout(editorHeadingHighlightTimeout);
+      editorHeadingHighlightTimeout = null;
+    }
+    if (editorHeadingHighlightRange) {
+      editorHeadingHighlightRange = null;
+    }
+    lastHighlightMarkup = null;
     updateEditorHighlight(editor.value);
     AppState.setText(editor.value, 'editor');
     updateLineNumbers();
@@ -2421,8 +2547,12 @@ a:hover {
     if (!event || typeof event.id !== 'string') {
       return;
     }
+    if (Preview && typeof Preview.clearHeadingHighlight === 'function') {
+      Preview.clearHeadingHighlight();
+    }
     pendingHeadingAlignmentId = event.id;
-    const headingInfo = headingPositions.find(h => h.id === event.id);
+    pendingHeadingHighlightId = event.id;
+    const headingInfo = headingInfoById.get(event.id);
     const previewDetail = getPreviewScrollTargetForHeading(event.id);
     if (headingInfo) {
       focusEditorOnHeading(headingInfo, previewDetail);
@@ -2436,15 +2566,31 @@ a:hover {
     if (!detail || typeof detail.id !== 'string') {
       return;
     }
-    if (!pendingHeadingAlignmentId || detail.id !== pendingHeadingAlignmentId) {
+    const matchesAlignment =
+      pendingHeadingAlignmentId && detail.id === pendingHeadingAlignmentId;
+    const matchesHighlight =
+      pendingHeadingHighlightId && detail.id === pendingHeadingHighlightId;
+    if (!matchesAlignment && !matchesHighlight) {
       return;
     }
-    pendingHeadingAlignmentId = null;
-    const headingInfo = headingPositions.find(h => h.id === detail.id);
-    if (!headingInfo) {
-      return;
+
+    const headingInfo = headingInfoById.get(detail.id);
+    if (matchesAlignment) {
+      pendingHeadingAlignmentId = null;
+      if (headingInfo) {
+        alignEditorScrollToHeading(headingInfo.start, detail);
+      }
     }
-    alignEditorScrollToHeading(headingInfo.start, detail);
+
+    if (matchesHighlight) {
+      pendingHeadingHighlightId = null;
+      if (headingInfo) {
+        flashEditorHeading(headingInfo);
+      }
+      if (Preview && typeof Preview.highlightHeading === 'function') {
+        Preview.highlightHeading(detail.id);
+      }
+    }
   });
 
   Bus.on('settings:changed', event => {

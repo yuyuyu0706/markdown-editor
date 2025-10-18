@@ -7,6 +7,18 @@ body {
   background-color: #e8f0ff;
 }
 
+:root {
+  --heading-flash-bg: #fff8b3;
+  --heading-flash-ring: rgba(255, 248, 179, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --heading-flash-bg: rgba(255, 225, 140, 0.4);
+    --heading-flash-ring: rgba(255, 225, 140, 0.55);
+  }
+}
+
 #toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -256,6 +268,11 @@ main {
   white-space: inherit;
 }
 
+#editor-highlight .editor-heading-flash {
+  background-color: var(--heading-flash-bg, #fff8b3);
+  box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
+}
+
 #editor-highlight .external-link-text {
   color: #6d7cff;
 }
@@ -353,6 +370,11 @@ main {
 #preview h5 {
   border-bottom: 1px solid #aac8ff;
   color: #0055aa;
+}
+
+#preview .preview-heading-flash {
+  background-color: var(--heading-flash-bg, #fff8b3);
+  box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
 }
 
 pre {
