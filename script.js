@@ -40,7 +40,6 @@ function startApp() {
   const markdownInput = document.getElementById('markdownInput');
   const toggleLineNumbersBtn = document.getElementById('toggle-line-numbers');
   const langSwitch = document.getElementById('lang-switch');
-
   if (editor) {
     if (!editorPane) {
       editorPane = document.createElement('div');
@@ -128,6 +127,18 @@ function startApp() {
     }
 
     return Boolean(editorHighlightContent);
+  }
+
+  function prefersReducedMotion() {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (error) {
+      console.warn('[Accessibility] Unable to determine reduced motion preference.', error);
+      return false;
+    }
   }
 
   function syncEditorHighlightPadding() {
@@ -587,6 +598,8 @@ function startApp() {
   let headings = [];
   let tocItems = [];
   let headingPositions = [];
+  let pendingHeadingAlignmentId = null;
+  let editorMeasurementElement = null;
 
   Preview.init();
   adjustTOCPosition();
@@ -1776,13 +1789,6 @@ function startApp() {
         }
 
         Bus.emit('toc:jump', { id: targetId });
-
-        const hp = headingPositions.find(h => h.id === targetId);
-        if (hp) {
-          editor.focus();
-          editor.selectionStart = editor.selectionEnd = hp.start;
-          updateTOCHighlight();
-        }
       });
     });
 
@@ -1803,6 +1809,208 @@ function startApp() {
     tocItems.forEach(item => {
       item.classList.toggle('active', item.dataset.target === currentId);
     });
+  }
+
+  function ensureEditorMeasurementElement() {
+    if (editorMeasurementElement && editorMeasurementElement.isConnected) {
+      return editorMeasurementElement;
+    }
+    const measure = document.createElement('div');
+    measure.setAttribute('aria-hidden', 'true');
+    measure.style.position = 'absolute';
+    measure.style.visibility = 'hidden';
+    measure.style.pointerEvents = 'none';
+    measure.style.whiteSpace = 'pre-wrap';
+    measure.style.wordWrap = 'break-word';
+    measure.style.top = '0';
+    measure.style.left = '-9999px';
+    measure.style.height = 'auto';
+    measure.style.minHeight = '0';
+    measure.style.maxHeight = 'none';
+    editorMeasurementElement = measure;
+    document.body.appendChild(editorMeasurementElement);
+    return editorMeasurementElement;
+  }
+
+  const MEASUREMENT_STYLE_PROPS = [
+    'box-sizing',
+    'width',
+    'padding-top',
+    'padding-right',
+    'padding-bottom',
+    'padding-left',
+    'border-top-width',
+    'border-right-width',
+    'border-bottom-width',
+    'border-left-width',
+    'border-top-style',
+    'border-right-style',
+    'border-bottom-style',
+    'border-left-style',
+    'font-family',
+    'font-size',
+    'font-style',
+    'font-variant',
+    'font-weight',
+    'line-height',
+    'letter-spacing',
+    'text-indent',
+    'text-transform',
+    'text-decoration',
+    'tab-size',
+    'word-break',
+    'word-spacing'
+  ];
+
+  function applyEditorMeasurementStyles(target) {
+    if (!editor) {
+      return null;
+    }
+    const styles = window.getComputedStyle(editor);
+    MEASUREMENT_STYLE_PROPS.forEach(prop => {
+      const value = styles.getPropertyValue(prop);
+      if (value) {
+        target.style.setProperty(prop, value);
+      } else {
+        target.style.removeProperty(prop);
+      }
+    });
+    target.style.overflow = 'visible';
+    target.style.height = 'auto';
+    target.style.minHeight = '0';
+    target.style.maxHeight = 'none';
+    return styles;
+  }
+
+  function parsePixelValue(styles, property) {
+    if (!styles || typeof styles.getPropertyValue !== 'function') {
+      return 0;
+    }
+    const value = styles.getPropertyValue(property);
+    if (typeof value !== 'string' || !value.trim()) {
+      return 0;
+    }
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function measureEditorContentBefore(position) {
+    if (!editor || typeof position !== 'number' || position < 0) {
+      return null;
+    }
+    const measurement = ensureEditorMeasurementElement();
+    const styles = applyEditorMeasurementStyles(measurement);
+    if (!styles) {
+      return null;
+    }
+    const value = editor.value || '';
+    const clampedPosition = Math.min(position, value.length);
+    const beforeText = value.slice(0, clampedPosition);
+    measurement.textContent = beforeText;
+    const marker = document.createElement('span');
+    marker.textContent = '\u200b';
+    measurement.appendChild(marker);
+    const markerTop = marker.offsetTop;
+    measurement.textContent = '';
+    const paddingTop = parsePixelValue(styles, 'padding-top');
+    return {
+      height: Math.max(0, markerTop - paddingTop),
+      paddingTop
+    };
+  }
+
+  function applyEditorScrollTop(value) {
+    if (!editor) {
+      return;
+    }
+    editor.scrollTop = value;
+    syncLineNumberScroll();
+  }
+
+  function animateEditorScrollTo(target) {
+    if (!editor) {
+      return;
+    }
+
+    const maxScroll = Math.max(editor.scrollHeight - editor.clientHeight, 0);
+    const clampedTarget = Math.min(Math.max(target, 0), maxScroll);
+
+    applyEditorScrollTop(clampedTarget);
+  }
+
+  function alignEditorScrollToHeading(position, previewDetail) {
+    if (!editor) {
+      return;
+    }
+    const measurement = measureEditorContentBefore(position);
+    if (!measurement) {
+      return;
+    }
+    const previewHeaderHeight =
+      previewDetail && Number.isFinite(previewDetail.headerHeight)
+        ? previewDetail.headerHeight
+        : 0;
+    const previewPaddingTop =
+      previewDetail && Number.isFinite(previewDetail.paddingTop)
+        ? previewDetail.paddingTop
+        : 0;
+    const desiredOffset = Math.max(
+      measurement.paddingTop,
+      previewHeaderHeight + previewPaddingTop
+    );
+    const targetScrollTop =
+      measurement.paddingTop +
+      measurement.height -
+      desiredOffset;
+    const maxScroll = Math.max(editor.scrollHeight - editor.clientHeight, 0);
+    const clamped = Math.min(Math.max(0, targetScrollTop), maxScroll);
+    animateEditorScrollTo(clamped);
+  }
+
+  function getPreviewScrollTargetForHeading(id) {
+    if (!headings || !headings.length) {
+      return null;
+    }
+    const headingElement = headings.find(h => h.id === id);
+    if (!headingElement) {
+      return null;
+    }
+    if (!Preview || typeof Preview.computeScrollTarget !== 'function') {
+      return null;
+    }
+    try {
+      return Preview.computeScrollTarget(headingElement);
+    } catch (error) {
+      console.warn('[TOC] Failed to compute preview scroll target for heading.', error);
+      return null;
+    }
+  }
+
+  function focusEditorOnHeading(headingInfo, previewDetail) {
+    if (!editor || !headingInfo) {
+      return;
+    }
+    const previousScrollTop = editor.scrollTop;
+    let preventScrollWorked = false;
+    if (typeof editor.focus === 'function') {
+      try {
+        editor.focus({ preventScroll: true });
+        preventScrollWorked = true;
+      } catch (error) {
+        editor.focus();
+      }
+    }
+    if (typeof editor.setSelectionRange === 'function') {
+      editor.setSelectionRange(headingInfo.start, headingInfo.start);
+    } else {
+      editor.selectionStart = editor.selectionEnd = headingInfo.start;
+    }
+    if (!preventScrollWorked && editor.scrollTop !== previousScrollTop) {
+      editor.scrollTop = previousScrollTop;
+      syncLineNumberScroll();
+    }
+    updateTOCHighlight();
+    alignEditorScrollToHeading(headingInfo.start, previewDetail);
   }
 
   editor.addEventListener('input', () => {
@@ -2213,7 +2421,30 @@ a:hover {
     if (!event || typeof event.id !== 'string') {
       return;
     }
-    Preview.scrollToHeading(event.id);
+    pendingHeadingAlignmentId = event.id;
+    const headingInfo = headingPositions.find(h => h.id === event.id);
+    const previewDetail = getPreviewScrollTargetForHeading(event.id);
+    if (headingInfo) {
+      focusEditorOnHeading(headingInfo, previewDetail);
+    }
+    if (Preview && typeof Preview.scrollToHeading === 'function') {
+      Preview.scrollToHeading(event.id);
+    }
+  });
+
+  Bus.on('preview:scrolled', detail => {
+    if (!detail || typeof detail.id !== 'string') {
+      return;
+    }
+    if (!pendingHeadingAlignmentId || detail.id !== pendingHeadingAlignmentId) {
+      return;
+    }
+    pendingHeadingAlignmentId = null;
+    const headingInfo = headingPositions.find(h => h.id === detail.id);
+    if (!headingInfo) {
+      return;
+    }
+    alignEditorScrollToHeading(headingInfo.start, detail);
   });
 
   Bus.on('settings:changed', event => {
