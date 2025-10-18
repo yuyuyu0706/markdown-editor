@@ -727,6 +727,17 @@
    * @param {HTMLElement} element
    * @returns {void}
    */
+  function resetPreviewHeadingFlash() {
+    if (previewHeadingFlashTimeout) {
+      global.clearTimeout(previewHeadingFlashTimeout);
+      previewHeadingFlashTimeout = null;
+    }
+    if (activePreviewHeading) {
+      activePreviewHeading.classList.remove('preview-heading-flash');
+      activePreviewHeading = null;
+    }
+  }
+
   function flashPreviewHeading(element) {
     if (!element) {
       return;
@@ -775,7 +786,6 @@
     const detail = { id: slug, top, headerHeight, paddingTop };
     const notify = () => dispatchPreviewScrolled(detail);
 
-    flashPreviewHeading(target);
     registerPreviewManualInteraction();
 
     if (difference <= 1) {
@@ -794,6 +804,33 @@
         };
         waitForSettle();
       }
+    }
+  }
+
+  function highlightHeadingById(slug) {
+    if (!previewEl || !slug) {
+      return;
+    }
+
+    const applyHighlight = () => {
+      let selector = '#' + slug;
+      if (global.CSS && typeof global.CSS.escape === 'function') {
+        selector = '#' + global.CSS.escape(slug);
+      }
+      const target = previewEl.querySelector(selector);
+      if (!target) {
+        resetPreviewHeadingFlash();
+        return;
+      }
+      flashPreviewHeading(target);
+    };
+
+    if (typeof global.requestAnimationFrame === 'function') {
+      global.requestAnimationFrame(() => {
+        global.requestAnimationFrame(applyHighlight);
+      });
+    } else {
+      global.setTimeout(applyHighlight, 0);
     }
   }
 
@@ -844,6 +881,8 @@
     init,
     render,
     scrollToHeading,
+    clearHeadingHighlight: resetPreviewHeadingFlash,
+    highlightHeading: highlightHeadingById,
     getCurrentScrollInfo,
     computeScrollTarget
   };

@@ -637,7 +637,9 @@ function startApp() {
   let headings = [];
   let tocItems = [];
   let headingPositions = [];
+  let headingInfoById = new Map();
   let pendingHeadingAlignmentId = null;
+  let pendingHeadingHighlightId = null;
   let editorMeasurementElement = null;
 
   Preview.init();
@@ -1744,8 +1746,35 @@ function startApp() {
 
   function buildTOC() {
     const raw = AppState.getText();
-    const slugCounts = {};
+    const globalWindow = typeof window !== 'undefined' ? window : undefined;
+    const slugger =
+      globalWindow &&
+      globalWindow.Slug &&
+      typeof globalWindow.Slug.createGenerator === 'function'
+        ? globalWindow.Slug.createGenerator()
+        : (() => {
+            const counts = Object.create(null);
+            return text => {
+              let source = typeof text === 'string' ? text : '';
+              try {
+                source = source.normalize('NFKD');
+              } catch (error) {
+                // ignore unsupported normalize
+              }
+              const base = source
+                .toLowerCase()
+                .replace(/\p{M}+/gu, '')
+                .trim()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/-{2,}/g, '-')
+                .replace(/^-+|-+$/g, '') || 'section';
+              const current = counts[base] || 0;
+              counts[base] = current + 1;
+              return current ? `${base}-${current}` : base;
+            };
+          })();
     headingPositions = [];
+    headingInfoById = new Map();
 
     // Collect heading lines while ignoring fenced code blocks
     const lines = raw.split('\n');
@@ -1763,18 +1792,17 @@ function startApp() {
         if (m) {
           const level = m[1].length;
           const text = m[2].trim();
-          const base = text.toLowerCase().replace(/[^\w]+/g, '-');
-          const count = slugCounts[base] || 0;
-          slugCounts[base] = count + 1;
-          const id = count ? `${base}-${count}` : base;
+          const id = slugger(text);
           const headingLength = line.length;
-          headingPositions.push({
+          const info = {
             level,
             text,
             id,
             start: index,
             end: index + headingLength
-          });
+          };
+          headingPositions.push(info);
+          headingInfoById.set(id, info);
         }
       }
       index += line.length + 1;
@@ -2101,7 +2129,6 @@ function startApp() {
     }
     updateTOCHighlight();
     alignEditorScrollToHeading(headingInfo.start, previewDetail);
-    flashEditorHeading(headingInfo);
   }
 
   editor.addEventListener('input', () => {
@@ -2520,8 +2547,12 @@ a:hover {
     if (!event || typeof event.id !== 'string') {
       return;
     }
+    if (Preview && typeof Preview.clearHeadingHighlight === 'function') {
+      Preview.clearHeadingHighlight();
+    }
     pendingHeadingAlignmentId = event.id;
-    const headingInfo = headingPositions.find(h => h.id === event.id);
+    pendingHeadingHighlightId = event.id;
+    const headingInfo = headingInfoById.get(event.id);
     const previewDetail = getPreviewScrollTargetForHeading(event.id);
     if (headingInfo) {
       focusEditorOnHeading(headingInfo, previewDetail);
@@ -2535,15 +2566,31 @@ a:hover {
     if (!detail || typeof detail.id !== 'string') {
       return;
     }
-    if (!pendingHeadingAlignmentId || detail.id !== pendingHeadingAlignmentId) {
+    const matchesAlignment =
+      pendingHeadingAlignmentId && detail.id === pendingHeadingAlignmentId;
+    const matchesHighlight =
+      pendingHeadingHighlightId && detail.id === pendingHeadingHighlightId;
+    if (!matchesAlignment && !matchesHighlight) {
       return;
     }
-    pendingHeadingAlignmentId = null;
-    const headingInfo = headingPositions.find(h => h.id === detail.id);
-    if (!headingInfo) {
-      return;
+
+    const headingInfo = headingInfoById.get(detail.id);
+    if (matchesAlignment) {
+      pendingHeadingAlignmentId = null;
+      if (headingInfo) {
+        alignEditorScrollToHeading(headingInfo.start, detail);
+      }
     }
-    alignEditorScrollToHeading(headingInfo.start, detail);
+
+    if (matchesHighlight) {
+      pendingHeadingHighlightId = null;
+      if (headingInfo) {
+        flashEditorHeading(headingInfo);
+      }
+      if (Preview && typeof Preview.highlightHeading === 'function') {
+        Preview.highlightHeading(detail.id);
+      }
+    }
   });
 
   Bus.on('settings:changed', event => {

@@ -7,6 +7,18 @@ body {
   background-color: #e8f0ff;
 }
 
+:root {
+  --heading-flash-bg: #fff8b3;
+  --heading-flash-ring: rgba(255, 248, 179, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --heading-flash-bg: rgba(255, 225, 140, 0.4);
+    --heading-flash-ring: rgba(255, 225, 140, 0.55);
+  }
+}
+
 #toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -257,25 +269,12 @@ main {
 }
 
 #editor-highlight .editor-heading-flash {
-  background-color: #fff4a3;
-  box-shadow: 0 0 0 2px rgba(255, 244, 163, 0.6);
-  animation: editor-heading-flash-fade 2s ease forwards;
+  background-color: var(--heading-flash-bg, #fff8b3);
+  box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
 }
 
 #editor-highlight .external-link-text {
   color: #6d7cff;
-}
-
-@keyframes editor-heading-flash-fade {
-  0% {
-    background-color: #fff4a3;
-    box-shadow: 0 0 0 2px rgba(255, 244, 163, 0.6);
-  }
-
-  100% {
-    background-color: transparent;
-    box-shadow: 0 0 0 2px rgba(255, 244, 163, 0);
-  }
 }
 
 #line-number-gutter {
@@ -374,21 +373,8 @@ main {
 }
 
 #preview .preview-heading-flash {
-  background-color: #fff4a3;
-  box-shadow: 0 0 0 2px rgba(255, 244, 163, 0.6);
-  animation: preview-heading-flash-fade 2s ease forwards;
-}
-
-@keyframes preview-heading-flash-fade {
-  0% {
-    background-color: #fff4a3;
-    box-shadow: 0 0 0 2px rgba(255, 244, 163, 0.6);
-  }
-
-  100% {
-    background-color: transparent;
-    box-shadow: 0 0 0 2px rgba(255, 244, 163, 0);
-  }
+  background-color: var(--heading-flash-bg, #fff8b3);
+  box-shadow: 0 0 0 2px var(--heading-flash-ring, rgba(255, 248, 179, 0.6));
 }
 
 pre {
