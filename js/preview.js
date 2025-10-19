@@ -29,6 +29,7 @@
   let editorManualScrollIntentUntil = 0;
   let isEditorScrollbarDragActive = false;
   let isPreviewManuallyPositioned = false;
+  let previewScrollGeneration = 0;
 
   let reducedMotionQuery = null;
   let prefersReducedMotion = false;
@@ -245,6 +246,7 @@
   function registerPreviewManualInteraction() {
     previewScrollSuppressUntil = 0;
     isPreviewManuallyPositioned = true;
+    previewScrollGeneration += 1;
   }
 
   function registerEditorManualInteraction() {
@@ -301,7 +303,10 @@
     return Math.min(value, maxScrollTop);
   }
 
-  function restorePreviewScrollPosition(targetScrollTop) {
+  function restorePreviewScrollPosition(targetScrollTop, generation) {
+    if (typeof generation === 'number' && generation !== previewScrollGeneration) {
+      return;
+    }
     const clamped = clampPreviewScrollTop(targetScrollTop);
     const prevSuppressUntil = previewScrollSuppressUntil;
     previewScrollSuppressUntil = Math.max(prevSuppressUntil, performance.now() + 50);
@@ -702,6 +707,7 @@
     const raw = typeof markdown === 'string' ? markdown : '';
     const renderStart = performance.now();
     const previousScrollTop = previewEl.scrollTop;
+    const scrollGeneration = previewScrollGeneration;
 
     const expanded = expandImagePlaceholders(raw);
     previewEl.innerHTML = global.marked
@@ -716,7 +722,7 @@
     previewScrollSuppressUntil =
       renderEnd + Math.max(PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION, renderDuration);
 
-    const restore = () => restorePreviewScrollPosition(previousScrollTop);
+    const restore = () => restorePreviewScrollPosition(previousScrollTop, scrollGeneration);
     restore();
     global.requestAnimationFrame(restore);
     global.requestAnimationFrame(() => global.requestAnimationFrame(restore));
