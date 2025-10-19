@@ -12,6 +12,10 @@
   const MANUAL_SCROLL_INTENT_DURATION = 1200;
   const HEADING_FLASH_DURATION = 2000;
   const HEADING_FLASH_FADE_DURATION = 600;
+  const HEADING_LOCK_DEADBAND = 12;
+  const HEADING_LOCK_ESCAPE_DISTANCE = 200;
+  const HEADING_LOCK_SUPPRESS_DURATION = 140;
+  const HEADING_LOCK_INACTIVITY_TIMEOUT = 3200;
 
   let previewEl = null;
   let toolbarEl = null;
@@ -30,6 +34,12 @@
   let isEditorScrollbarDragActive = false;
   let isPreviewManuallyPositioned = false;
   let previewScrollGeneration = 0;
+  let headingLockActive = false;
+  let headingLockId = null;
+  let headingLockStartedAt = 0;
+  let headingLockLastUpdatedAt = 0;
+  let headingLockGeneration = 0;
+  let headingLockLastDetail = null;
 
   let reducedMotionQuery = null;
   let prefersReducedMotion = false;
@@ -243,10 +253,23 @@
     }
   }
 
-  function registerPreviewManualInteraction() {
+  function markPreviewManualInteraction({ skipGeneration } = {}) {
     previewScrollSuppressUntil = 0;
     isPreviewManuallyPositioned = true;
-    previewScrollGeneration += 1;
+    if (!skipGeneration) {
+      previewScrollGeneration += 1;
+    }
+  }
+
+  function registerPreviewManualInteraction(event) {
+    if (isHeadingLockEngaged()) {
+      markPreviewManualInteraction({ skipGeneration: true });
+      return;
+    }
+    if (event && typeof event.preventDefault === 'function') {
+      // No-op: the event parameter is ignored but maintained for signature compatibility.
+    }
+    markPreviewManualInteraction();
   }
 
   function registerEditorManualInteraction() {
@@ -342,6 +365,180 @@
       global.Bus.emit('preview:scrolled', detail);
     }
     previewEl.dispatchEvent(new CustomEvent('preview:scrolled', { detail }));
+  }
+
+  function isHeadingLockEngaged() {
+    return headingLockActive && typeof headingLockId === 'string' && headingLockId.length > 0;
+  }
+
+  function emitHeadingLockEvent(type, payload) {
+    if (!global.Bus || typeof global.Bus.emit !== 'function') {
+      return;
+    }
+    global.Bus.emit(type, payload);
+  }
+
+  function getHeadingElementById(slug) {
+    if (!previewEl || !slug) {
+      return null;
+    }
+    let selector = '#' + slug;
+    if (global.CSS && typeof global.CSS.escape === 'function') {
+      selector = '#' + global.CSS.escape(slug);
+    }
+    return previewEl.querySelector(selector);
+  }
+
+  function activateHeadingLock(slug, detail) {
+    if (!slug) {
+      return;
+    }
+    if (headingLockActive && headingLockId === slug) {
+      headingLockLastUpdatedAt = performance.now();
+      headingLockLastDetail = detail || headingLockLastDetail;
+      return;
+    }
+    headingLockActive = true;
+    headingLockId = slug;
+    headingLockStartedAt = performance.now();
+    headingLockLastUpdatedAt = headingLockStartedAt;
+    headingLockGeneration = previewScrollGeneration;
+    headingLockLastDetail = detail || null;
+    emitHeadingLockEvent('preview:heading-lock-activated', { id: headingLockId });
+  }
+
+  function deactivateHeadingLock(reason) {
+    if (!headingLockActive) {
+      return;
+    }
+    headingLockActive = false;
+    headingLockId = null;
+    headingLockStartedAt = 0;
+    headingLockLastUpdatedAt = 0;
+    headingLockGeneration = 0;
+    headingLockLastDetail = null;
+    emitHeadingLockEvent('preview:heading-lock-deactivated', { reason: reason || '' });
+  }
+
+  function notifyHeadingLockSync(detail, source) {
+    if (!detail || !detail.id) {
+      return;
+    }
+    emitHeadingLockEvent('preview:heading-lock-sync', {
+      id: detail.id,
+      top: detail.top,
+      headerHeight: detail.headerHeight,
+      paddingTop: detail.paddingTop,
+      source: source || 'preview'
+    });
+  }
+
+  function checkHeadingLockTimeout(now) {
+    if (!isHeadingLockEngaged()) {
+      return;
+    }
+    const reference = headingLockLastUpdatedAt || headingLockStartedAt || now;
+    if (now - reference > HEADING_LOCK_INACTIVITY_TIMEOUT) {
+      deactivateHeadingLock('timeout');
+    }
+  }
+
+  function maintainHeadingLock(source, options = {}) {
+    if (!isHeadingLockEngaged()) {
+      return false;
+    }
+    const headingEl = getHeadingElementById(headingLockId);
+    if (!headingEl) {
+      deactivateHeadingLock('missing-heading');
+      return false;
+    }
+    let detail;
+    try {
+      detail = computeScrollTarget(headingEl);
+    } catch (error) {
+      console.warn('[Preview] Failed to compute heading lock target.', error);
+      deactivateHeadingLock('compute-error');
+      return false;
+    }
+
+    if (!detail) {
+      deactivateHeadingLock('no-detail');
+      return false;
+    }
+
+    headingLockLastDetail = detail;
+    const now = performance.now();
+    headingLockLastUpdatedAt = now;
+    previewScrollGeneration = headingLockGeneration;
+
+    const force = Boolean(options.force);
+    const allowEscape = options.allowEscape !== false;
+    const deadband = Number.isFinite(options.deadband)
+      ? options.deadband
+      : HEADING_LOCK_DEADBAND;
+    const escapeDistance = Number.isFinite(options.escapeDistance)
+      ? options.escapeDistance
+      : HEADING_LOCK_ESCAPE_DISTANCE;
+
+    const diff = Math.abs(previewEl.scrollTop - detail.top);
+
+    if (!force && diff <= deadband) {
+      updateScrollInfo();
+      if (options.forceNotify) {
+        dispatchPreviewScrolled(detail);
+        notifyHeadingLockSync(detail, source);
+      }
+      return true;
+    }
+
+    if (allowEscape && diff >= escapeDistance && source !== 'layout') {
+      deactivateHeadingLock('manual-escape');
+      return false;
+    }
+
+    const suppressDuration = Number.isFinite(options.suppressDuration)
+      ? options.suppressDuration
+      : HEADING_LOCK_SUPPRESS_DURATION;
+    const suppressUntil = now + suppressDuration;
+
+    previewScrollSuppressUntil = Math.max(previewScrollSuppressUntil, suppressUntil);
+    editorScrollSuppressUntil = Math.max(editorScrollSuppressUntil, suppressUntil);
+
+    isSyncingPreviewScroll = true;
+    previewEl.scrollTop = detail.top;
+    isSyncingPreviewScroll = false;
+    updateScrollInfo();
+
+    isSyncingEditorScroll = true;
+    dispatchPreviewScrolled(detail);
+    notifyHeadingLockSync(detail, source);
+    if (typeof global.requestAnimationFrame === 'function') {
+      global.requestAnimationFrame(() => {
+        if (isSyncingEditorScroll) {
+          isSyncingEditorScroll = false;
+        }
+      });
+    } else {
+      global.setTimeout(() => {
+        if (isSyncingEditorScroll) {
+          isSyncingEditorScroll = false;
+        }
+      }, 0);
+    }
+    return true;
+  }
+
+  function scheduleHeadingLockMaintenance() {
+    if (!isHeadingLockEngaged()) {
+      return;
+    }
+    const perform = () => maintainHeadingLock('layout', { force: true, allowEscape: false });
+    if (typeof global.requestAnimationFrame === 'function') {
+      global.requestAnimationFrame(perform);
+      global.requestAnimationFrame(() => global.requestAnimationFrame(perform));
+    } else {
+      global.setTimeout(perform, 0);
+    }
   }
 
   function expandImagePlaceholders(raw) {
@@ -522,16 +719,39 @@
     scrollToHeading(slug);
   }
 
+  function handlePreviewLoadEvent() {
+    if (!isHeadingLockEngaged()) {
+      return;
+    }
+    maintainHeadingLock('layout', {
+      force: true,
+      allowEscape: false,
+      suppressDuration: PREVIEW_RENDER_SCROLL_SUPPRESS_DURATION,
+      forceNotify: true
+    });
+  }
+
   function handlePreviewScroll() {
     if (isSyncingPreviewScroll) {
       isSyncingPreviewScroll = false;
       return;
     }
-    if (performance.now() < previewScrollSuppressUntil) {
+    const now = performance.now();
+    checkHeadingLockTimeout(now);
+    if (now < previewScrollSuppressUntil) {
       updateScrollInfo();
       return;
     }
-    registerPreviewManualInteraction();
+    if (isHeadingLockEngaged()) {
+      markPreviewManualInteraction({ skipGeneration: true });
+      const maintained = maintainHeadingLock('preview');
+      if (maintained) {
+        return;
+      }
+      markPreviewManualInteraction();
+    } else {
+      markPreviewManualInteraction();
+    }
     isSyncingEditorScroll = true;
     syncScroll(previewEl, editorEl);
     updateScrollInfo();
@@ -542,6 +762,21 @@
     if (isSyncingEditorScroll) {
       isSyncingEditorScroll = false;
       return;
+    }
+    checkHeadingLockTimeout(now);
+    if (isHeadingLockEngaged()) {
+      if (now < editorScrollSuppressUntil) {
+        return;
+      }
+      const manualIntent =
+        editorManualScrollIntentUntil === Infinity || now < editorManualScrollIntentUntil;
+      if (!manualIntent) {
+        return;
+      }
+      const maintained = maintainHeadingLock('editor');
+      if (maintained) {
+        return;
+      }
     }
     const hasManualIntent =
       editorManualScrollIntentUntil === Infinity || now < editorManualScrollIntentUntil;
@@ -562,6 +797,7 @@
 
   function handleEditorTextInput() {
     extendEditorScrollSuppression();
+    deactivateHeadingLock('editor-input');
   }
 
   function handleEditorPointerDown(event) {
@@ -638,6 +874,7 @@
     previewEl.addEventListener('change', handlePreviewCheckboxChange);
     previewEl.addEventListener('scroll', handlePreviewScroll);
     previewEl.addEventListener('click', handlePreviewClick);
+    previewEl.addEventListener('load', handlePreviewLoadEvent, true);
   }
 
   function attachEditorEvents() {
@@ -680,6 +917,7 @@
     });
     global.Bus.on('preview:manual-reset', () => {
       isPreviewManuallyPositioned = false;
+      deactivateHeadingLock('manual-reset');
     });
   }
 
@@ -729,6 +967,7 @@
     global.requestAnimationFrame(() => global.requestAnimationFrame(restore));
 
     extendEditorScrollSuppression(renderDuration + INPUT_SCROLL_SUPPRESS_DURATION);
+    scheduleHeadingLockMaintenance();
   }
 
   /**
@@ -821,7 +1060,9 @@
     const detail = { id: slug, top, headerHeight, paddingTop };
     const notify = () => dispatchPreviewScrolled(detail);
 
-    registerPreviewManualInteraction();
+    deactivateHeadingLock('replaced');
+    markPreviewManualInteraction();
+    activateHeadingLock(slug, detail);
 
     if (difference <= 1) {
       global.requestAnimationFrame(notify);
@@ -829,6 +1070,7 @@
       previewEl.scrollTop = top;
       global.requestAnimationFrame(notify);
     }
+    scheduleHeadingLockMaintenance();
   }
 
   function highlightHeadingById(slug) {
