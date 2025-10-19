@@ -694,7 +694,6 @@ function startApp() {
   let headingInfoById = new Map();
   let pendingHeadingAlignmentId = null;
   let pendingHeadingHighlightId = null;
-  let activePreviewHeadingLockId = null;
   let editorMeasurementElement = null;
 
   Preview.init();
@@ -2650,31 +2649,6 @@ a:hover {
         Preview.highlightHeading(detail.id);
       }
     }
-  });
-
-  Bus.on('preview:heading-lock-activated', event => {
-    if (!event || typeof event.id !== 'string') {
-      return;
-    }
-    activePreviewHeadingLockId = event.id;
-  });
-
-  Bus.on('preview:heading-lock-deactivated', () => {
-    activePreviewHeadingLockId = null;
-  });
-
-  Bus.on('preview:heading-lock-sync', detail => {
-    if (!detail || typeof detail.id !== 'string') {
-      return;
-    }
-    if (!activePreviewHeadingLockId || detail.id !== activePreviewHeadingLockId) {
-      return;
-    }
-    const headingInfo = headingInfoById.get(detail.id);
-    if (!headingInfo) {
-      return;
-    }
-    alignEditorScrollToHeading(headingInfo.start, detail);
   });
 
   Bus.on('settings:changed', event => {
