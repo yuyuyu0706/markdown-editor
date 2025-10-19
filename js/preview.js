@@ -243,10 +243,14 @@
     }
   }
 
-  function registerPreviewManualInteraction() {
+  function invalidatePreviewScrollRestoration() {
     previewScrollSuppressUntil = 0;
-    isPreviewManuallyPositioned = true;
     previewScrollGeneration += 1;
+  }
+
+  function registerPreviewManualInteraction() {
+    invalidatePreviewScrollRestoration();
+    isPreviewManuallyPositioned = true;
   }
 
   function registerEditorManualInteraction() {
@@ -820,7 +824,7 @@
     const detail = { id: slug, top, headerHeight, paddingTop };
     const notify = () => dispatchPreviewScrolled(detail);
 
-    registerPreviewManualInteraction();
+    invalidatePreviewScrollRestoration();
 
     if (difference <= 1) {
       global.requestAnimationFrame(notify);
