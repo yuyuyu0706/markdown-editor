@@ -531,6 +531,7 @@
       updateScrollInfo();
       return;
     }
+    registerPreviewManualInteraction();
     isSyncingEditorScroll = true;
     syncScroll(previewEl, editorEl);
     updateScrollInfo();
