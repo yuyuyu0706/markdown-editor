@@ -692,6 +692,7 @@ function startApp() {
   let tocItems = [];
   let headingPositions = [];
   let headingInfoById = new Map();
+  let cursorHeadingHighlightId = null;
   let pendingHeadingAlignmentId = null;
   let pendingHeadingHighlightId = null;
   let editorMeasurementElement = null;
@@ -1829,6 +1830,7 @@ function startApp() {
           })();
     headingPositions = [];
     headingInfoById = new Map();
+    cursorHeadingHighlightId = null;
 
     // Collect heading lines while ignoring fenced code blocks
     const lines = raw.split('\n');
@@ -1923,12 +1925,67 @@ function startApp() {
     updateTOCHighlight();
   }
 
+  function getHeadingInfoAtPosition(position) {
+    if (!headingPositions.length) {
+      return null;
+    }
+
+    for (const info of headingPositions) {
+      const start = Number.isFinite(info.start) ? info.start : 0;
+      const end = Number.isFinite(info.end) && info.end >= start ? info.end : start;
+      if (position < start) {
+        break;
+      }
+      if (position >= start && position < end) {
+        return info;
+      }
+    }
+
+    return null;
+  }
+
+  function updateCursorHeadingHighlight() {
+    if (!editor) {
+      cursorHeadingHighlightId = null;
+      return null;
+    }
+
+    const start = Number.isFinite(editor.selectionStart) ? editor.selectionStart : 0;
+    const end = Number.isFinite(editor.selectionEnd) ? editor.selectionEnd : start;
+    const anchor = Math.min(start, end);
+    const focus = Math.max(start, end);
+    const isCollapsed = anchor === focus;
+
+    if (!isCollapsed) {
+      cursorHeadingHighlightId = null;
+      return null;
+    }
+
+    const headingInfo = getHeadingInfoAtPosition(anchor);
+    if (!headingInfo) {
+      cursorHeadingHighlightId = null;
+      return null;
+    }
+
+    if (cursorHeadingHighlightId === headingInfo.id) {
+      return headingInfo;
+    }
+
+    cursorHeadingHighlightId = headingInfo.id;
+    flashEditorHeading(headingInfo);
+    if (Preview && typeof Preview.highlightHeading === 'function') {
+      Preview.highlightHeading(headingInfo.id);
+    }
+
+    return headingInfo;
+  }
+
   function updateTOCHighlight() {
     if (!headingPositions.length) return;
-    const pos = editor.selectionStart;
+    const start = Number.isFinite(editor.selectionStart) ? editor.selectionStart : 0;
     let currentId = headingPositions[0].id;
     for (const hp of headingPositions) {
-      if (pos >= hp.start) {
+      if (start >= hp.start) {
         currentId = hp.id;
       } else {
         break;
@@ -1937,6 +1994,7 @@ function startApp() {
     tocItems.forEach(item => {
       item.classList.toggle('active', item.dataset.target === currentId);
     });
+    updateCursorHeadingHighlight();
   }
 
   function ensureEditorMeasurementElement() {
