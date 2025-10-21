@@ -696,6 +696,21 @@ function startApp() {
   let pendingHeadingAlignmentId = null;
   let pendingHeadingHighlightId = null;
   let editorMeasurementElement = null;
+  let hasUserActivatedHeadingHighlight = false;
+
+  const markHeadingHighlightActivation = () => {
+    if (hasUserActivatedHeadingHighlight) {
+      return;
+    }
+    hasUserActivatedHeadingHighlight = true;
+    document.removeEventListener('pointerdown', markHeadingHighlightActivation, true);
+    document.removeEventListener('keydown', markHeadingHighlightActivation, true);
+    document.removeEventListener('touchstart', markHeadingHighlightActivation, true);
+  };
+
+  document.addEventListener('pointerdown', markHeadingHighlightActivation, true);
+  document.addEventListener('keydown', markHeadingHighlightActivation, true);
+  document.addEventListener('touchstart', markHeadingHighlightActivation, true);
 
   Preview.init();
   adjustTOCPosition();
@@ -1967,13 +1982,22 @@ function startApp() {
       return null;
     }
 
+    if (!hasUserActivatedHeadingHighlight) {
+      cursorHeadingHighlightId = null;
+      return headingInfo;
+    }
+
     if (cursorHeadingHighlightId === headingInfo.id) {
       return headingInfo;
     }
 
     cursorHeadingHighlightId = headingInfo.id;
     flashEditorHeading(headingInfo);
-    if (Preview && typeof Preview.highlightHeading === 'function') {
+    if (
+      hasUserActivatedHeadingHighlight &&
+      Preview &&
+      typeof Preview.highlightHeading === 'function'
+    ) {
       Preview.highlightHeading(headingInfo.id);
     }
 
@@ -2700,10 +2724,14 @@ a:hover {
 
     if (matchesHighlight) {
       pendingHeadingHighlightId = null;
-      if (headingInfo) {
+      if (headingInfo && hasUserActivatedHeadingHighlight) {
         flashEditorHeading(headingInfo);
       }
-      if (Preview && typeof Preview.highlightHeading === 'function') {
+      if (
+        hasUserActivatedHeadingHighlight &&
+        Preview &&
+        typeof Preview.highlightHeading === 'function'
+      ) {
         Preview.highlightHeading(detail.id);
       }
     }
