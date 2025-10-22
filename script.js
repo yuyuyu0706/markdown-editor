@@ -1348,6 +1348,11 @@ function startApp() {
       return;
     }
 
+    const collapseSelection = () => {
+      editor.selectionStart = selectionEnd;
+      editor.selectionEnd = selectionEnd;
+    };
+
     const attemptExecCommandCopy = () => {
       const activeElement = document.activeElement;
       try {
@@ -1360,6 +1365,7 @@ function startApp() {
       } catch (error) {
         // Ignore copy errors to avoid interrupting the user experience.
       } finally {
+        collapseSelection();
         if (
           activeElement &&
           activeElement !== editor &&
@@ -1382,6 +1388,7 @@ function startApp() {
             clipboardHasText = true;
             updateClipboardButtonStates();
           }
+          collapseSelection();
         })
         .catch(attemptExecCommandCopy);
     } else {
